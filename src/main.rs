@@ -9,6 +9,8 @@ mod audio;
 mod dev_tools;
 mod screens;
 mod input;
+mod ui;
+mod mario;
 
 use bevy::ecs::schedule::ScheduleLabel;
 use bevy::{asset::AssetMetaCheck, prelude::*};
@@ -44,7 +46,8 @@ impl Plugin for AppPlugin {
                     }
                         .into(),
                     ..default()
-                }),
+                })
+                .set(ImagePlugin::default_nearest()),
         );
 
         // Add other plugins.
@@ -52,9 +55,11 @@ impl Plugin for AppPlugin {
             asset_tracking::plugin,
             audio::plugin,
             screens::plugin,
+            ui::plugin,
+            mario::plugin,
             #[cfg(feature = "dev")]
             dev_tools::plugin,
-            CobwebUiPlugin)).load("main.cob");
+            CobwebUiPlugin)).load("ui/main.cob");
 
         // Order new `AppSystems` variants by adding them here:
         app.configure_sets(
@@ -72,8 +77,6 @@ impl Plugin for AppPlugin {
         app.configure_sets(Update, PausableSystems.run_if(in_state(Pause(false))));
 
         // Spawn the main camera.
-        app.add_systems(Startup, (spawn_camera));
-        app.add_systems(OnEnter(LoadState::Done), build_ui);
     }
 }
 
@@ -98,11 +101,4 @@ struct Pause(pub bool);
 #[derive(SystemSet, Copy, Clone, Eq, PartialEq, Hash, Debug)]
 struct PausableSystems;
 
-fn spawn_camera(mut commands: Commands) {
-    commands.spawn((Name::new("Camera"), Camera2d));
-}
 
-
-fn build_ui(mut commands: Commands, mut s: SceneBuilder) {
-    commands.ui_root().spawn_scene_simple(("main.cob", "main_scene"), &mut s);
-}
