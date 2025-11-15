@@ -272,20 +272,6 @@
 					"gridTiles": [],
 					"entityInstances": [
 						{
-							"__identifier": "Mario",
-							"__grid": [3,6],
-							"__pivot": [0,0],
-							"__tags": [],
-							"__tile": { "tilesetUid": 9, "x": 0, "y": 0, "w": 16, "h": 16 },
-							"__smartColor": "#BE4A2F",
-							"iid": "28349b10-ac70-11f0-930d-7d08d7e7ede4",
-							"width": 16,
-							"height": 16,
-							"defUid": 10,
-							"px": [48,96],
-							"fieldInstances": []
-						},
-						{
 							"__identifier": "Goal",
 							"__grid": [26,6],
 							"__pivot": [0,0],
@@ -297,6 +283,20 @@
 							"height": 16,
 							"defUid": 12,
 							"px": [416,96],
+							"fieldInstances": []
+						},
+						{
+							"__identifier": "Mario",
+							"__grid": [13,6],
+							"__pivot": [0,0],
+							"__tags": [],
+							"__tile": { "tilesetUid": 9, "x": 0, "y": 0, "w": 16, "h": 16 },
+							"__smartColor": "#BE4A2F",
+							"iid": "28349b10-ac70-11f0-930d-7d08d7e7ede4",
+							"width": 16,
+							"height": 16,
+							"defUid": 10,
+							"px": [208,96],
 							"fieldInstances": []
 						}
 					]

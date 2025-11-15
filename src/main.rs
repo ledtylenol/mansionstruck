@@ -11,6 +11,7 @@ mod screens;
 mod input;
 mod ui;
 mod mario;
+mod physics;
 
 use bevy::ecs::schedule::ScheduleLabel;
 use bevy::{asset::AssetMetaCheck, prelude::*};
@@ -57,6 +58,7 @@ impl Plugin for AppPlugin {
             screens::plugin,
             ui::plugin,
             mario::plugin,
+            physics::plugin,
             #[cfg(feature = "dev")]
             dev_tools::plugin,
             CobwebUiPlugin)).load("ui/main.cob");

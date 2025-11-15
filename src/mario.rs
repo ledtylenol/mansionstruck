@@ -1,13 +1,21 @@
 use avian2d::prelude::*;
+use bevy::asset::ron;
 use bevy::prelude::*;
 use bevy_ecs_ldtk::prelude::*;
+use serde::Deserialize;
+use std::fs::read_to_string;
+
 #[derive(Default, Bundle, LdtkEntity)]
 pub struct PlayerBundle {
     #[sprite_sheet]
     sprite_sheet: Sprite,
+    #[from_entity_instance]
+    collider_bundle: ColliderBundle,
+    #[from_entity_instance]
+    entity_instance: EntityInstance,
 }
 
-#[derive(Bundle, Clone, Default, LdtkIntCell)]
+#[derive(Bundle, Clone, Default, LdtkIntCell, Deserialize)]
 pub struct ColliderBundle {
     pub collider: Collider,
     pub rb: RigidBody,
@@ -20,21 +28,13 @@ pub struct ColliderBundle {
 
 impl From<&EntityInstance> for ColliderBundle {
     fn from(entity_instance: &EntityInstance) -> Self {
-        let rotation_constraints = LockedAxes::ROTATION_LOCKED;
-
-        match entity_instance.identifier.as_ref() {
-            "Player" => ColliderBundle {
-                collider: Collider::rectangle(6., 14.),
-                rb: RigidBody::Dynamic,
-                friction: Friction {
-                    dynamic_coefficient: 0.0,
-                    static_coefficient: 0.0,
-                    combine_rule: CoefficientCombine::Min,
-                },
-                rotation_constraints,
-                ..default()
-            }
-        }
+        error!("I AM HERE)");
+        let path = format!("assets/entities/{}", entity_instance.identifier.to_lowercase());
+        let Some(str) = read_to_string(path).ok() else {
+            warn!("did not find an entity file for the identifier");
+            return Self::default();
+        };
+        ron::de::from_str(&str).map_err(|e| warn!("could not parse {e}")).unwrap_or_default()
     }
 }
 #[derive(Default, Bundle, LdtkEntity)]
