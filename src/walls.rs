@@ -191,7 +191,7 @@ pub struct WallPlugin;
 impl Plugin for WallPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Update, spawn_wall_collision)
-            .register_ldtk_int_cell::<WallBundle>(1) //dirt
-            .register_ldtk_int_cell::<WallBundle>(3); //stone
+            .register_ldtk_int_cell::<WallBundle>(1) //brick
+            .register_ldtk_int_cell::<WallBundle>(2); //interactables
     }
 }

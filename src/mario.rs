@@ -6,6 +6,8 @@ use bevy_ecs_ldtk::prelude::*;
 use serde::Deserialize;
 use std::fs::read_to_string;
 
+#[derive(Component, Default)]
+pub struct Mario;
 #[derive(Default, Bundle, LdtkEntity)]
 pub struct PlayerBundle {
     #[sprite_sheet]
@@ -16,6 +18,8 @@ pub struct PlayerBundle {
     pub entity_instance: EntityInstance,
     #[worldly]
     pub worldly: Worldly,
+
+    pub mario: Mario,
 }
 
 //extra step to convert
@@ -43,18 +47,9 @@ pub struct ColliderBundle {
     pub friction: Friction,
     pub density: ColliderMassProperties,
 }
-
-impl From<ColliderShape> for Collider {
-    fn from(value: ColliderShape) -> Self {
-        match value {
-            ColliderShape::Ball(radius) => Collider::circle(radius),
-            ColliderShape::Cuboid(w, h) => Collider::rectangle(w, h),
-            ColliderShape::Capsule(hw, hh) => Collider::capsule(hw, hh),
-        }
-    }
-}
 impl From<ColliderBuilder> for ColliderBundle {
     fn from(
+        //pattern matching in function definitions...
         ColliderBuilder {
             collider,
             rb,
