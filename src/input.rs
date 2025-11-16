@@ -8,7 +8,6 @@ enum Action {
     Pause,
 }
 
-
 pub(crate) fn plugin(app: &mut App) {
     app.add_plugins(InputManagerPlugin::<Action>::default());
 }

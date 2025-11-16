@@ -1,5 +1,5 @@
 (
-    collider: Cuboid(50., 50.),
+    collider: Cuboid(14., 16.),
     rb: Dynamic,
     velocity: LinearVelocity(Vec2(0., 0.)),
     rotation_constraints: LockedAxes(7),

@@ -49,12 +49,22 @@ impl From<ColliderShape> for Collider {
         match value {
             ColliderShape::Ball(radius) => Collider::circle(radius),
             ColliderShape::Cuboid(w, h) => Collider::rectangle(w, h),
-            ColliderShape::Capsule(hw, hh) => Collider::capsule(hw, hh)
+            ColliderShape::Capsule(hw, hh) => Collider::capsule(hw, hh),
         }
     }
 }
 impl From<ColliderBuilder> for ColliderBundle {
-    fn from(ColliderBuilder { collider, rb, velocity, rotation_constraints, gravity_scale, friction, density }: ColliderBuilder) -> Self {
+    fn from(
+        ColliderBuilder {
+            collider,
+            rb,
+            velocity,
+            rotation_constraints,
+            gravity_scale,
+            friction,
+            density,
+        }: ColliderBuilder,
+    ) -> Self {
         let collider = collider.into();
         Self {
             collider,
@@ -71,14 +81,20 @@ impl From<ColliderBuilder> for ColliderBundle {
 impl From<&EntityInstance> for ColliderBundle {
     fn from(entity_instance: &EntityInstance) -> Self {
         error!("I AM HERE)");
-        let path = format!("assets/entities/{}.ron", entity_instance.identifier.to_lowercase());
+        let path = format!(
+            "assets/entities/{}.ron",
+            entity_instance.identifier.to_lowercase()
+        );
         info!("Looking at path: {path}");
         let Some(str) = read_to_string(path).ok() else {
             warn!("did not find an entity file for the identifier");
             return Self::default();
         };
         //str -> Result<ColliderBuilder> -> ColliderBuilder -> ColliderBundle
-        ron::de::from_str::<ColliderBuilder>(&str).map_err(|e| warn!("could not parse {e}")).unwrap_or_default().into()
+        ron::de::from_str::<ColliderBuilder>(&str)
+            .map_err(|e| warn!("could not parse {e}"))
+            .unwrap_or_default()
+            .into()
     }
 }
 #[derive(Default, Bundle, LdtkEntity)]
@@ -87,15 +103,13 @@ pub struct GoalBundle {
     sprite_sheet: Sprite,
 }
 pub(crate) fn plugin(app: &mut App) {
-    app
-        .add_plugins(LdtkPlugin)
+    app.add_plugins(LdtkPlugin)
+        .add_plugins(super::walls::WallPlugin)
         .insert_resource(LevelSelection::index(0))
         .register_ldtk_entity::<PlayerBundle>("Mario")
         .register_ldtk_entity::<GoalBundle>("Goal")
-        .add_systems(Startup, setup)
-    ;
+        .add_systems(Startup, setup);
 }
-
 
 fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands.spawn((

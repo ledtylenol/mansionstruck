@@ -7,11 +7,12 @@ mod asset_tracking;
 mod audio;
 #[cfg(feature = "dev")]
 mod dev_tools;
-mod screens;
 mod input;
-mod ui;
 mod mario;
 mod physics;
+mod screens;
+mod ui;
+mod walls;
 
 use bevy::ecs::schedule::ScheduleLabel;
 use bevy::{asset::AssetMetaCheck, prelude::*};
@@ -45,7 +46,7 @@ impl Plugin for AppPlugin {
                         fit_canvas_to_parent: true,
                         ..default()
                     }
-                        .into(),
+                    .into(),
                     ..default()
                 })
                 .set(ImagePlugin::default_nearest()),
@@ -61,7 +62,9 @@ impl Plugin for AppPlugin {
             physics::plugin,
             #[cfg(feature = "dev")]
             dev_tools::plugin,
-            CobwebUiPlugin)).load("ui/main.cob");
+            CobwebUiPlugin,
+        ))
+        .load("ui/main.cob");
 
         // Order new `AppSystems` variants by adding them here:
         app.configure_sets(
@@ -102,5 +105,3 @@ struct Pause(pub bool);
 /// A system set for systems that shouldn't run while the game is paused.
 #[derive(SystemSet, Copy, Clone, Eq, PartialEq, Hash, Debug)]
 struct PausableSystems;
-
-
