@@ -1,0 +1,7 @@
+(
+    collider: Cuboid(50., 50.),
+    rb: Dynamic,
+    velocity: LinearVelocity(Vec2(0., 0.)),
+    rotation_constraints: LockedAxes(7),
+    gravity_scale: GravityScale(0.),
+)

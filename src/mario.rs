@@ -1,3 +1,4 @@
+use crate::physics::ColliderShape;
 use avian2d::prelude::*;
 use bevy::asset::ron;
 use bevy::prelude::*;
@@ -8,14 +9,31 @@ use std::fs::read_to_string;
 #[derive(Default, Bundle, LdtkEntity)]
 pub struct PlayerBundle {
     #[sprite_sheet]
-    sprite_sheet: Sprite,
+    pub sprite_sheet: Sprite,
     #[from_entity_instance]
-    collider_bundle: ColliderBundle,
+    pub collider_bundle: ColliderBundle,
     #[from_entity_instance]
-    entity_instance: EntityInstance,
+    pub entity_instance: EntityInstance,
+    #[worldly]
+    pub worldly: Worldly,
 }
 
-#[derive(Bundle, Clone, Default, LdtkIntCell, Deserialize)]
+//extra step to convert
+#[derive(Clone, Default, Deserialize)]
+pub struct ColliderBuilder {
+    pub collider: ColliderShape,
+    pub rb: RigidBody,
+    pub velocity: LinearVelocity,
+    #[serde(default)]
+    pub rotation_constraints: LockedAxes,
+    #[serde(default)]
+    pub gravity_scale: GravityScale,
+    #[serde(default)]
+    pub friction: Friction,
+    #[serde(default)]
+    pub density: ColliderMassProperties,
+}
+#[derive(Bundle, Clone, Default, LdtkIntCell)]
 pub struct ColliderBundle {
     pub collider: Collider,
     pub rb: RigidBody,
@@ -26,15 +44,41 @@ pub struct ColliderBundle {
     pub density: ColliderMassProperties,
 }
 
+impl From<ColliderShape> for Collider {
+    fn from(value: ColliderShape) -> Self {
+        match value {
+            ColliderShape::Ball(radius) => Collider::circle(radius),
+            ColliderShape::Cuboid(w, h) => Collider::rectangle(w, h),
+            ColliderShape::Capsule(hw, hh) => Collider::capsule(hw, hh)
+        }
+    }
+}
+impl From<ColliderBuilder> for ColliderBundle {
+    fn from(ColliderBuilder { collider, rb, velocity, rotation_constraints, gravity_scale, friction, density }: ColliderBuilder) -> Self {
+        let collider = collider.into();
+        Self {
+            collider,
+            rb,
+            velocity,
+            rotation_constraints,
+            gravity_scale,
+            friction,
+            density,
+        }
+    }
+}
+
 impl From<&EntityInstance> for ColliderBundle {
     fn from(entity_instance: &EntityInstance) -> Self {
         error!("I AM HERE)");
-        let path = format!("assets/entities/{}", entity_instance.identifier.to_lowercase());
+        let path = format!("assets/entities/{}.ron", entity_instance.identifier.to_lowercase());
+        info!("Looking at path: {path}");
         let Some(str) = read_to_string(path).ok() else {
             warn!("did not find an entity file for the identifier");
             return Self::default();
         };
-        ron::de::from_str(&str).map_err(|e| warn!("could not parse {e}")).unwrap_or_default()
+        //str -> Result<ColliderBuilder> -> ColliderBuilder -> ColliderBundle
+        ron::de::from_str::<ColliderBuilder>(&str).map_err(|e| warn!("could not parse {e}")).unwrap_or_default().into()
     }
 }
 #[derive(Default, Bundle, LdtkEntity)]
@@ -45,10 +89,10 @@ pub struct GoalBundle {
 pub(crate) fn plugin(app: &mut App) {
     app
         .add_plugins(LdtkPlugin)
-        .add_systems(Startup, setup)
         .insert_resource(LevelSelection::index(0))
-        .register_ldtk_entity::<PlayerBundle>("Player")
+        .register_ldtk_entity::<PlayerBundle>("Mario")
         .register_ldtk_entity::<GoalBundle>("Goal")
+        .add_systems(Startup, setup)
     ;
 }
 
