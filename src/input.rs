@@ -2,7 +2,7 @@ use bevy::prelude::*;
 use leafwing_input_manager::prelude::*;
 #[derive(Actionlike, Debug, Clone, Copy, Hash, PartialEq, Eq, Reflect)]
 
-enum Action {
+pub enum Action {
     #[actionlike(DualAxis)]
     Move,
     Pause,

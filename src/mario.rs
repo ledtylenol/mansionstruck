@@ -1,8 +1,11 @@
+use crate::input::Action;
 use crate::physics::{ColliderShape, KinematicController};
 use avian2d::prelude::*;
 use bevy::asset::ron;
 use bevy::prelude::*;
 use bevy_ecs_ldtk::prelude::*;
+use leafwing_input_manager::action_state::AxisData;
+use leafwing_input_manager::prelude::*;
 use serde::Deserialize;
 use std::fs::read_to_string;
 
@@ -104,9 +107,16 @@ pub(crate) fn plugin(app: &mut App) {
         .insert_resource(LevelSelection::index(0))
         .register_ldtk_entity::<PlayerBundle>("Mario")
         .register_ldtk_entity::<GoalBundle>("Goal")
-        .add_systems(Startup, setup);
+        .add_systems(Startup, setup)
+        .add_systems(FixedUpdate, move_mario.before(crate::physics::apply_gravity));
 }
 
+fn move_mario(mario: Single<(&mut LinearVelocity, &ActionState<Action>), With<Mario>>, time: Res<Time>) {
+    let (mut vel, state) = mario.into_inner();
+    if let Some(axis) = state.axis_data(&Action::Move).map(|AxisData { value, .. }| value) {
+        vel.0 = vel.0.move_towards(vec2(axis * 50.0, vel.y), time.delta_secs() * 50.0);
+    }
+}
 fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands.spawn((
         Camera2d,

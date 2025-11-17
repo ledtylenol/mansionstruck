@@ -47,7 +47,7 @@ impl Plugin for AppPlugin {
                         fit_canvas_to_parent: true,
                         ..default()
                     }
-                    .into(),
+                        .into(),
                     ..default()
                 })
                 .set(ImagePlugin::default_nearest()),
@@ -65,8 +65,9 @@ impl Plugin for AppPlugin {
             dev_tools::plugin,
             CobwebUiPlugin,
             StateMachinePlugin::default(),
+            input::plugin,
         ))
-        .load("ui/main.cob");
+            .load("ui/main.cob");
 
         // Order new `AppSystems` variants by adding them here:
         app.configure_sets(
