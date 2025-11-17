@@ -18,6 +18,7 @@ use bevy::ecs::schedule::ScheduleLabel;
 use bevy::{asset::AssetMetaCheck, prelude::*};
 use bevy_cobweb::prelude::*;
 use bevy_cobweb_ui::prelude::*;
+use seldom_state::prelude::*;
 
 #[derive(Copy, Clone, Component)]
 struct RotateComp;
@@ -63,6 +64,7 @@ impl Plugin for AppPlugin {
             #[cfg(feature = "dev")]
             dev_tools::plugin,
             CobwebUiPlugin,
+            StateMachinePlugin::default(),
         ))
         .load("ui/main.cob");
 

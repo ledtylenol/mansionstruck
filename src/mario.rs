@@ -1,4 +1,4 @@
-use crate::physics::ColliderShape;
+use crate::physics::{ColliderShape, KinematicController};
 use avian2d::prelude::*;
 use bevy::asset::ron;
 use bevy::prelude::*;
@@ -20,6 +20,7 @@ pub struct PlayerBundle {
     pub worldly: Worldly,
 
     pub mario: Mario,
+    pub controller: KinematicController,
 }
 
 //extra step to convert
