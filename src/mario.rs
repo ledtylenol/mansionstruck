@@ -1,16 +1,18 @@
-use crate::input::Action;
+use crate::input::Move;
 use crate::physics::{ColliderShape, KinematicController};
 use avian2d::prelude::*;
 use bevy::asset::ron;
+use bevy::asset::ron::error::SpannedResult;
 use bevy::prelude::*;
 use bevy_ecs_ldtk::prelude::*;
-use leafwing_input_manager::action_state::AxisData;
-use leafwing_input_manager::prelude::*;
+use bevy_enhanced_input::prelude::*;
 use serde::Deserialize;
 use std::fs::read_to_string;
 
 #[derive(Component, Default)]
-pub struct Mario;
+pub struct Mario {
+    pub velocity: Vec2,
+}
 #[derive(Default, Bundle, LdtkEntity)]
 pub struct PlayerBundle {
     #[sprite_sheet]
@@ -76,7 +78,6 @@ impl From<ColliderBuilder> for ColliderBundle {
         }
     }
 }
-
 impl From<&EntityInstance> for ColliderBundle {
     fn from(entity_instance: &EntityInstance) -> Self {
         error!("I AM HERE)");
@@ -101,6 +102,7 @@ pub struct GoalBundle {
     #[sprite_sheet]
     sprite_sheet: Sprite,
 }
+
 pub(crate) fn plugin(app: &mut App) {
     app.add_plugins(LdtkPlugin)
         .add_plugins(super::walls::WallPlugin)
@@ -108,14 +110,21 @@ pub(crate) fn plugin(app: &mut App) {
         .register_ldtk_entity::<PlayerBundle>("Mario")
         .register_ldtk_entity::<GoalBundle>("Goal")
         .add_systems(Startup, setup)
-        .add_systems(FixedUpdate, move_mario.before(crate::physics::apply_gravity));
+        .add_observer(move_mario)
+        .add_observer(register_input_map);
 }
 
-fn move_mario(mario: Single<(&mut LinearVelocity, &ActionState<Action>), With<Mario>>, time: Res<Time>) {
-    let (mut vel, state) = mario.into_inner();
-    if let Some(axis) = state.axis_data(&Action::Move).map(|AxisData { value, .. }| value) {
-        vel.0 = vel.0.move_towards(vec2(axis * 50.0, vel.y), time.delta_secs() * 50.0);
-    }
+fn move_mario(
+    movement: On<Fire<Move>>,
+    mario: Single<&mut KinematicController, With<Mario>>,
+    time: Res<Time>,
+) {
+    info!("the mario is on the move {}", movement.value);
+    let mut vel = mario.into_inner();
+    let axis = movement.value;
+    vel.velocity = vel
+        .velocity
+        .move_towards(vec2(axis * 500.0, vel.velocity.y), time.delta_secs() * 50.0);
 }
 fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands.spawn((
@@ -131,4 +140,17 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
         ldtk_handle: asset_server.load("ldtk/mayrio.ldtk").into(),
         ..Default::default()
     });
+}
+
+fn register_input_map(e: On<Add, Mario>, mut commands: Commands) {
+    let Ok(file) = read_to_string("assets/input.ron") else {
+        warn!("did not find an input file");
+        commands.entity(e.entity).insert(actions!(
+            Mario[(
+                Action::<Move>::new(),
+                Bindings::spawn(Bidirectional::new(KeyCode::KeyA, KeyCode::KeyD))
+            )]
+        ));
+        return;
+    };
 }

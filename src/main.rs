@@ -14,6 +14,8 @@ mod screens;
 mod ui;
 mod walls;
 
+mod char_controller;
+
 use bevy::ecs::schedule::ScheduleLabel;
 use bevy::{asset::AssetMetaCheck, prelude::*};
 use bevy_cobweb::prelude::*;
@@ -47,7 +49,7 @@ impl Plugin for AppPlugin {
                         fit_canvas_to_parent: true,
                         ..default()
                     }
-                        .into(),
+                    .into(),
                     ..default()
                 })
                 .set(ImagePlugin::default_nearest()),
@@ -59,15 +61,15 @@ impl Plugin for AppPlugin {
             audio::plugin,
             screens::plugin,
             ui::plugin,
+            input::plugin,
             mario::plugin,
             physics::plugin,
             #[cfg(feature = "dev")]
             dev_tools::plugin,
             CobwebUiPlugin,
             StateMachinePlugin::default(),
-            input::plugin,
         ))
-            .load("ui/main.cob");
+        .load("ui/main.cob");
 
         // Order new `AppSystems` variants by adding them here:
         app.configure_sets(

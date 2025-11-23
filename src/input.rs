@@ -1,13 +1,11 @@
+use crate::mario::Mario;
 use bevy::prelude::*;
-use leafwing_input_manager::prelude::*;
-#[derive(Actionlike, Debug, Clone, Copy, Hash, PartialEq, Eq, Reflect)]
+use bevy_enhanced_input::prelude::*;
 
-pub enum Action {
-    #[actionlike(DualAxis)]
-    Move,
-    Pause,
-}
-
+#[derive(InputAction)]
+#[action_output(f32)]
+pub struct Move;
 pub(crate) fn plugin(app: &mut App) {
-    app.add_plugins(InputManagerPlugin::<Action>::default());
+    app.add_plugins(EnhancedInputPlugin)
+        .add_input_context::<Mario>();
 }

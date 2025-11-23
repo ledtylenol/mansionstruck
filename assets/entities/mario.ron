@@ -3,5 +3,5 @@
     rb: Kinematic,
     velocity: LinearVelocity(Vec2(0., 0.)),
     rotation_constraints: LockedAxes(0b111),
-    gravity_scale: GravityScale(5.),
+    gravity_scale: GravityScale(0.),
 )
