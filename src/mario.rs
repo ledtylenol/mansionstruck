@@ -111,8 +111,7 @@ pub(crate) fn plugin(app: &mut App) {
         .register_ldtk_entity::<PlayerBundle>("Mario")
         .register_ldtk_entity::<GoalBundle>("Goal")
         .add_systems(Startup, setup)
-        .add_systems(Update, (check_moving, friction).chain())
-        .add_observer(move_mario)
+        .add_systems(Update, (move_mario).chain())
         .add_observer(jump)
         //.add_observer(friction)
         .add_observer(register_input_map);
@@ -126,37 +125,28 @@ fn jump(
     controller.velocity.y = 350.0;
     mario.time_since_space = 0.0;
 }
-fn friction(mario: Single<(&mut KinematicController, &Mario)>, time: Res<Time>) {
-    let (mut vel, mario) = mario.into_inner();
-    if mario.moving { return; }
-    vel.velocity = vel
-        .velocity
-        .move_towards(vec2(0.0, vel.velocity.y), time.delta_secs() * 750.0);
-}
-fn check_moving(
-    mario: Single<(Entity, &mut Mario)>,
-    action_states: Query<(&ActionState, &ActionOf<Mario>), With<Action<Move>>>,
-) {
-    let (entity, mut mario) = mario.into_inner();
-    for (action_state, action_of) in action_states.iter() {
-        if action_of.entity() == entity {
-            match action_state {
-                ActionState::None => mario.moving = false,
-                _ => mario.moving = true,
-            }
-        }
-    }
-}
 fn move_mario(
-    movement: On<Fire<Move>>,
     mario: Single<&mut KinematicController, With<Mario>>,
+    inputs: Single<&ActionValue, With<Action<Move>>>,
     time: Res<Time>,
 ) {
     let mut vel = mario.into_inner();
-    let axis = movement.value;
-    vel.velocity = vel
-        .velocity
-        .move_towards(vec2(axis * 50.0, vel.velocity.y), time.delta_secs() * 350.0);
+    match inputs.into_inner() {
+        &ActionValue::Axis1D(axis) => {
+            let speed = if axis != 0.0 {
+                350.0
+            } else {
+                650.0
+            };
+            vel.velocity = vel
+                .velocity
+                .move_towards(vec2(axis * 50.0, vel.velocity.y), time.delta_secs() * speed);
+            info!("axis is {axis}");
+        }
+        av => {
+            info!("action is not axis, it is {av:?}");
+        }
+    }
 }
 fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands.spawn((
