@@ -5107,6 +5107,7 @@ dependencies = [
  "bevy_fmod",
  "bevy_tween",
  "rand",
+ "ron 0.12.0",
  "seldom_state",
  "serde",
  "tracing",
@@ -5348,6 +5349,20 @@ dependencies = [
  "bitflags 2.9.4",
  "serde",
  "serde_derive",
+ "unicode-ident",
+]
+
+[[package]]
+name = "ron"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fd490c5b18261893f14449cbd28cb9c0b637aebf161cd77900bfdedaff21ec32"
+dependencies = [
+ "bitflags 2.9.4",
+ "once_cell",
+ "serde",
+ "serde_derive",
+ "typeid",
  "unicode-ident",
 ]
 

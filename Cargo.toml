@@ -69,6 +69,7 @@ seldom_state = "0.15.0"
 bevy_ecs_ldtk = "0.13.0"
 avian2d = { version = "0.4.1", features = ["serialize"] }
 bevy_enhanced_input = { version = "0.20.0", features = ["serialize"] }
+ron = "0.12.0"
 [features]
 # Default to a native dev build.
 default = ["dev_native"]

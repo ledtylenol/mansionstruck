@@ -21,14 +21,14 @@ pub struct KinematicController {
 }
 pub(crate) fn plugin(app: &mut App) {
     app.add_plugins(PhysicsPlugins::default().with_length_unit(10.0))
-        .add_systems(FixedUpdate, (apply_gravity, perform_move_and_slide).chain());
+        .add_systems(
+            FixedUpdate,
+            (check_grounded, apply_gravity, perform_move_and_slide).chain(),
+        );
 }
 
 pub fn apply_gravity(
-    mut kinematics: Query<
-        (&mut KinematicController, Option<&GravityScale>),
-        Without<Grounded>,
-    >,
+    mut kinematics: Query<(&mut KinematicController, Option<&GravityScale>), Without<Grounded>>,
     time: Res<Time>,
 ) {
     for (mut controller, scale) in kinematics.iter_mut() {
@@ -54,33 +54,73 @@ impl Default for ColliderShape {
         ColliderShape::Cuboid(20.0, 20.0)
     }
 }
+fn check_grounded(
+    mut char: Query<(
+        Entity,
+        &Collider,
+        &mut KinematicController,
+        &mut Transform,
+        Option<&Grounded>,
+    )>,
+    move_and_slide: MoveAndSlide,
+    time: Res<Time>,
+    mut commands: Commands,
+) {
+    for (entity, collider, mut controller, mut transform, grounded) in char.iter_mut() {
+        let velocity = vec2(0.0, -1.0);
+        let filter = SpatialQueryFilter::from_excluded_entities([entity]);
+        let out = move_and_slide.cast_move(
+            collider,
+            transform.translation.xy().adjust_precision(),
+            transform
+                .rotation
+                .to_euler(EulerRot::XYZ)
+                .2
+                .adjust_precision(),
+            velocity,
+            MoveAndSlideConfig::default().skin_width,
+            &filter,
+        );
+        if out.is_none() && grounded.is_some() {
+            commands.entity(entity).remove::<Grounded>();
+            info!("removing grounded for entity {entity}");
+        }
+        if let Some(data) = out
+            && grounded.is_none()
+        {
+            info!("applying grounded to entity {entity}");
+            commands.entity(entity).insert(Grounded);
+        }
+    }
+}
 fn perform_move_and_slide(
-    player: Single<(Entity, &Collider, &mut KinematicController, &mut Transform)>,
+    mut char: Query<(Entity, &Collider, &mut KinematicController, &mut Transform)>,
     move_and_slide: MoveAndSlide,
     time: Res<Time>,
 ) {
-    let (entity, collider, mut controller, mut transform) = player.into_inner();
-    let velocity = controller.velocity;
-    let filter = SpatialQueryFilter::from_excluded_entities([entity]);
-    let mut collisions = HashSet::new();
-    let out = move_and_slide.move_and_slide(
-        collider,
-        transform.translation.xy().adjust_precision(),
-        transform
-            .rotation
-            .to_euler(EulerRot::XYZ)
-            .2
-            .adjust_precision(),
-        velocity,
-        time.delta(),
-        &MoveAndSlideConfig::default(),
-        &filter,
-        |hit| {
-            collisions.insert(hit.entity);
-            true
-        },
-    );
-    transform.translation = out.position.f32().extend(0.0);
-    controller.velocity = out.projected_velocity;
-    info!("Colliding with entities: {:?}", collisions);
+    for (entity, collider, mut controller, mut transform) in char.iter_mut() {
+        let velocity = controller.velocity;
+        let filter = SpatialQueryFilter::from_excluded_entities([entity]);
+        let mut collisions = HashSet::new();
+        let out = move_and_slide.move_and_slide(
+            collider,
+            transform.translation.xy().adjust_precision(),
+            transform
+                .rotation
+                .to_euler(EulerRot::XYZ)
+                .2
+                .adjust_precision(),
+            velocity,
+            time.delta(),
+            &MoveAndSlideConfig::default(),
+            &filter,
+            |hit| {
+                collisions.insert(hit.entity);
+                true
+            },
+        );
+        transform.translation = out.position.f32().extend(0.0);
+        controller.velocity = out.projected_velocity;
+        //info!("{} is colliding with entities: {:?}", entity, collisions);
+    }
 }

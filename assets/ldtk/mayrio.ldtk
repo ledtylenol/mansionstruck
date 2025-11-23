@@ -629,7 +629,7 @@
 						},
 						{
 							"__identifier": "Mario",
-							"__grid": [13,5],
+							"__grid": [13,6],
 							"__pivot": [0,0],
 							"__tags": [],
 							"__tile": { "tilesetUid": 9, "x": 0, "y": 0, "w": 16, "h": 16 },
@@ -638,7 +638,7 @@
 							"width": 16,
 							"height": 16,
 							"defUid": 10,
-							"px": [208,80],
+							"px": [208,96],
 							"fieldInstances": []
 						}
 					]

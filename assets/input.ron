@@ -1,0 +1,44 @@
+(
+    left: [
+        Keyboard(
+            key: KeyA,
+            mod_keys: (0),
+        ),
+        Keyboard(
+            key: ArrowLeft,
+            mod_keys: (0),
+        ),
+    ],
+    right: [
+        Keyboard(
+            key: KeyD,
+            mod_keys: (0),
+        ),
+        Keyboard(
+            key: ArrowRight,
+            mod_keys: (0),
+        ),
+    ],
+    jump: [
+        Keyboard(
+            key: Space,
+            mod_keys: (0),
+        ),
+    ],
+    run: [
+        Keyboard(
+            key: ShiftLeft,
+            mod_keys: (0),
+        ),
+    ],
+    crouch: [
+        Keyboard(
+            key: KeyS,
+            mod_keys: (0),
+        ),
+        Keyboard(
+            key: ArrowDown,
+            mod_keys: (0),
+        ),
+    ],
+)
