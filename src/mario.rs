@@ -1,4 +1,4 @@
-use crate::input::Move;
+use crate::input::{Crouch, InputSettings, Jump, Move, Run};
 use crate::physics::{ColliderShape, KinematicController};
 use avian2d::prelude::*;
 use bevy::asset::ron;
@@ -142,15 +142,32 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     });
 }
 
-fn register_input_map(e: On<Add, Mario>, mut commands: Commands) {
-    let Ok(file) = read_to_string("assets/input.ron") else {
-        warn!("did not find an input file");
-        commands.entity(e.entity).insert(actions!(
-            Mario[(
-                Action::<Move>::new(),
-                Bindings::spawn(Bidirectional::new(KeyCode::KeyA, KeyCode::KeyD))
-            )]
-        ));
-        return;
-    };
+fn register_input_map(
+    e: On<Add, Mario>,
+    mut commands: Commands,
+    input_settings: Res<InputSettings>,
+) {
+    commands.entity(e.entity).insert(actions!(
+        Mario[(
+            Action::<Jump>::new(),
+            Bindings::spawn(SpawnIter(input_settings.jump.into_iter()))
+        ),
+        (
+            Action::<Run>::new(),
+            Bindings::spawn(SpawnIter(input_settings.run.into_iter()))
+        ),
+        (
+            Action::<Crouch>::new(),
+            Bindings::spawn(SpawnIter(input_settings.crouch.into_iter()))
+        ),
+        (
+            Action::<Move>::new(),
+            Bindings::spawn((
+            Bidirectional::new(input_settings.right[0], input_settings.left[0]),
+            Bidirectional::new(input_settings.right[1], input_settings.left[1]),
+            Bidirectional::new(input_settings.right[2], input_settings.left[2]),
+        ))
+        )
+    ]
+    ));
 }
