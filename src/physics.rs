@@ -55,18 +55,16 @@ impl Default for ColliderShape {
     }
 }
 fn check_grounded(
-    mut char: Query<(
+    char: Query<(
         Entity,
         &Collider,
-        &mut KinematicController,
-        &mut Transform,
+        &Transform,
         Option<&Grounded>,
     )>,
     move_and_slide: MoveAndSlide,
-    time: Res<Time>,
     mut commands: Commands,
 ) {
-    for (entity, collider, mut controller, mut transform, grounded) in char.iter_mut() {
+    for (entity, collider, transform, grounded) in char.iter() {
         let velocity = vec2(0.0, -1.0);
         let filter = SpatialQueryFilter::from_excluded_entities([entity]);
         let out = move_and_slide.cast_move(
@@ -84,8 +82,7 @@ fn check_grounded(
         if out.is_none() && grounded.is_some() {
             commands.entity(entity).remove::<Grounded>();
             info!("removing grounded for entity {entity}");
-        }
-        if let Some(data) = out
+        } else if out.is_some()
             && grounded.is_none()
         {
             info!("applying grounded to entity {entity}");

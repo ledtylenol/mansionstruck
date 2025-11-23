@@ -1,5 +1,5 @@
 use crate::input::{Crouch, InputSettings, Jump, Move, Run};
-use crate::physics::{ColliderShape, KinematicController};
+use crate::physics::{ColliderShape, Grounded, KinematicController};
 use avian2d::prelude::*;
 use bevy::asset::ron;
 use bevy::asset::ron::error::SpannedResult;
@@ -11,7 +11,8 @@ use std::fs::read_to_string;
 
 #[derive(Component, Default)]
 pub struct Mario {
-    pub velocity: Vec2,
+    pub time_since_space: f32,
+    pub moving: bool,
 }
 #[derive(Default, Bundle, LdtkEntity)]
 pub struct PlayerBundle {
@@ -110,21 +111,52 @@ pub(crate) fn plugin(app: &mut App) {
         .register_ldtk_entity::<PlayerBundle>("Mario")
         .register_ldtk_entity::<GoalBundle>("Goal")
         .add_systems(Startup, setup)
+        .add_systems(Update, (check_moving, friction).chain())
         .add_observer(move_mario)
+        .add_observer(jump)
+        //.add_observer(friction)
         .add_observer(register_input_map);
 }
 
+fn jump(
+    _jump: On<Fire<Jump>>,
+    mario: Single<(&mut KinematicController, &mut Mario), With<Grounded>>,
+) {
+    let (mut controller, mut mario) = mario.into_inner();
+    controller.velocity.y = 350.0;
+    mario.time_since_space = 0.0;
+}
+fn friction(mario: Single<(&mut KinematicController, &Mario)>, time: Res<Time>) {
+    let (mut vel, mario) = mario.into_inner();
+    if mario.moving { return; }
+    vel.velocity = vel
+        .velocity
+        .move_towards(vec2(0.0, vel.velocity.y), time.delta_secs() * 750.0);
+}
+fn check_moving(
+    mario: Single<(Entity, &mut Mario)>,
+    action_states: Query<(&ActionState, &ActionOf<Mario>), With<Action<Move>>>,
+) {
+    let (entity, mut mario) = mario.into_inner();
+    for (action_state, action_of) in action_states.iter() {
+        if action_of.entity() == entity {
+            match action_state {
+                ActionState::None => mario.moving = false,
+                _ => mario.moving = true,
+            }
+        }
+    }
+}
 fn move_mario(
     movement: On<Fire<Move>>,
     mario: Single<&mut KinematicController, With<Mario>>,
     time: Res<Time>,
 ) {
-    info!("the mario is on the move {}", movement.value);
     let mut vel = mario.into_inner();
     let axis = movement.value;
     vel.velocity = vel
         .velocity
-        .move_towards(vec2(axis * 500.0, vel.velocity.y), time.delta_secs() * 50.0);
+        .move_towards(vec2(axis * 50.0, vel.velocity.y), time.delta_secs() * 350.0);
 }
 fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands.spawn((
