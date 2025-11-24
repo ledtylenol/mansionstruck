@@ -1,5 +1,5 @@
 use crate::char_controller::prelude::*;
-use crate::mario::Mario;
+use crate::mario::{JumpStats, Mario};
 use avian2d::math::{AdjustPrecision, AsF32};
 use avian2d::prelude::*;
 use bevy::platform::collections::HashSet;
@@ -28,15 +28,18 @@ pub(crate) fn plugin(app: &mut App) {
 }
 
 pub fn apply_gravity(
-    mut kinematics: Query<(&mut KinematicController, Option<&GravityScale>), Without<Grounded>>,
+    mut kinematics: Query<(&mut KinematicController, Option<&GravityScale>, Option<&mut JumpStats>), Without<Grounded>>,
     time: Res<Time>,
 ) {
-    for (mut controller, scale) in kinematics.iter_mut() {
-        if let Some(GravityScale(gravity)) = scale {
-            controller.velocity.y -= 90.0 * gravity * time.delta_secs();
-        } else {
-            controller.velocity.y -= 90.0 * time.delta_secs();
+    for (mut controller, scale, stats) in kinematics.iter_mut() {
+        let mut gravity = match stats {
+            Some(mut t) => t.get_gravity(controller.velocity.y),
+            None => JumpStats::default().get_gravity(controller.velocity.y),
+        };
+        if let Some(GravityScale(scale)) = scale {
+            gravity *= scale;
         }
+        controller.velocity.y += gravity * time.delta_secs();
     }
 }
 
@@ -55,12 +58,7 @@ impl Default for ColliderShape {
     }
 }
 fn check_grounded(
-    char: Query<(
-        Entity,
-        &Collider,
-        &Transform,
-        Option<&Grounded>,
-    )>,
+    char: Query<(Entity, &Collider, &Transform, Option<&Grounded>)>,
     move_and_slide: MoveAndSlide,
     mut commands: Commands,
 ) {
@@ -82,9 +80,7 @@ fn check_grounded(
         if out.is_none() && grounded.is_some() {
             commands.entity(entity).remove::<Grounded>();
             info!("removing grounded for entity {entity}");
-        } else if out.is_some()
-            && grounded.is_none()
-        {
+        } else if out.is_some() && grounded.is_none() {
             info!("applying grounded to entity {entity}");
             commands.entity(entity).insert(Grounded);
         }
