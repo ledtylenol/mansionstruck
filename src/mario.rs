@@ -7,12 +7,11 @@ use bevy_enhanced_input::prelude::*;
 use serde::Deserialize;
 use std::fs::read_to_string;
 
-#[derive(Component, Default, Reflect)]
+#[derive(Component, Default, Reflect, Deserialize)]
 pub struct Mario {
     pub time_since_space: f32,
     pub last_pos: f32,
     pub horizontal_dist: f32,
-    pub ping_pong: i32,
 }
 
 impl Mario {
@@ -95,6 +94,19 @@ impl Default for JumpStats {
         Self::new(80.0, 1.0, 1.0)
     }
 }
+#[derive(Component, Reflect, Deserialize, Clone, Debug)]
+pub struct MoveStats {
+    pub move_speed: f32,
+    pub run_speed: f32,
+}
+impl Default for MoveStats {
+    fn default() -> Self {
+        MoveStats {
+            move_speed: 75.0,
+            run_speed: 135.0,
+        }
+    }
+}
 #[derive(Default, Bundle, LdtkEntity)]
 pub struct PlayerBundle {
     #[sprite_sheet]
@@ -106,17 +118,44 @@ pub struct PlayerBundle {
     #[worldly]
     pub worldly: Worldly,
 
-    pub mario: Mario,
+    #[from_entity_instance]
+    pub mario: MarioBundle,
     pub controller: KinematicController,
 }
 
+#[derive(Bundle, Default, Deserialize)]
+pub struct MarioBundle {
+    #[serde(default)]
+    pub mario: Mario,
+    pub move_stats: MoveStats,
+    pub jump_stats: JumpStats,
+}
+impl From<&EntityInstance> for MarioBundle {
+    fn from(entity_instance: &EntityInstance) -> Self {
+        let path = format!(
+            "assets/entities/{}/entity.ron",
+            entity_instance.identifier.to_lowercase()
+        );
+        info!("Looking at path: {path}");
+        let Some(str) = read_to_string(path).ok() else {
+            warn!("did not find an entity file for the identifier");
+            return Self::default();
+        };
+        //str -> Result<ColliderBuilder> -> ColliderBuilder -> ColliderBundle
+        ron::de::from_str::<_>(&str)
+            .map_err(|e| {
+                warn!("could not parse {e}");
+                e
+            })
+            .unwrap_or_default()
+    }
+}
 //extra step to convert
 #[derive(Clone, Default, Deserialize)]
 pub struct ColliderBuilder {
     pub collider: ColliderShape,
     pub rb: RigidBody,
     pub shape_caster: ShapeCasterBuilder,
-    pub jump_stats: JumpStats,
     #[serde(default)]
     pub rotation_constraints: LockedAxes,
     //get_gravity * scale
@@ -130,7 +169,6 @@ pub struct ColliderBundle {
     pub collider: Collider,
     pub rb: RigidBody,
     pub shape_caster: ShapeCaster,
-    pub jump_stats: JumpStats,
     pub rotation_constraints: LockedAxes,
     pub gravity_scale: GravityScale,
     pub friction: Friction,
@@ -161,7 +199,6 @@ impl From<ColliderBuilder> for ColliderBundle {
             collider,
             rb,
             shape_caster,
-            jump_stats,
             rotation_constraints,
             gravity_scale,
             friction,
@@ -173,7 +210,6 @@ impl From<ColliderBuilder> for ColliderBundle {
             collider,
             rb,
             shape_caster,
-            jump_stats,
             rotation_constraints,
             gravity_scale,
             friction,
@@ -183,7 +219,7 @@ impl From<ColliderBuilder> for ColliderBundle {
 impl From<&EntityInstance> for ColliderBundle {
     fn from(entity_instance: &EntityInstance) -> Self {
         let path = format!(
-            "assets/entities/{}.ron",
+            "assets/entities/{}/collider.ron",
             entity_instance.identifier.to_lowercase()
         );
         info!("Looking at path: {path}");
@@ -214,8 +250,7 @@ pub(crate) fn plugin(app: &mut App) {
         .register_ldtk_entity::<PlayerBundle>("Mario")
         .register_ldtk_entity::<GoalBundle>("Goal")
         .add_systems(Startup, setup)
-        .add_systems(Update, (move_mario, update_sprite).chain())
-        .add_observer(jump)
+        .add_systems(Update, (jump, move_mario, update_sprite).chain())
         //.add_observer(friction)
         .add_observer(register_input_map);
 }
@@ -246,12 +281,21 @@ fn update_sprite(
     mario.last_pos = tf.translation.x;
 }
 fn jump(
-    _jump: On<Start<Jump>>,
+    jump: Single<(&ActionState, &ActionTime), With<Action<Jump>>>,
     mario: Single<(&mut KinematicController, &mut Mario, &mut JumpStats, &mut Sprite), With<Grounded>>,
+    time: Res<Time>,
 ) {
+    //don't jump if it's been 0.1s
     let (mut controller, mut mario, mut stats, mut sprite) = mario.into_inner();
+    let (&state, &ActionTime { elapsed_secs, .. }) = jump.into_inner();
+    if state != ActionState::None && elapsed_secs < 0.1 {
+        mario.time_since_space = 0.0;
+    } else {
+        mario.time_since_space += time.delta_secs();
+    }
+    if mario.time_since_space >= 0.1 { return; }
     controller.velocity.y = stats.get_jump_velocity();
-    mario.time_since_space = 0.0;
+    mario.time_since_space = 0.1;
     //if we dont have an atlas something went very very wrong
     let Some(atlas) = &mut sprite.texture_atlas else { return; };
     atlas.index = 5;
