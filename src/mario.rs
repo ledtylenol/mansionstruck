@@ -250,7 +250,7 @@ pub(crate) fn plugin(app: &mut App) {
         .register_ldtk_entity::<PlayerBundle>("Mario")
         .register_ldtk_entity::<GoalBundle>("Goal")
         .add_systems(Startup, setup)
-        .add_systems(Update, (jump, move_mario, update_sprite).chain())
+        .add_systems(Update, (move_mario, update_sprite, jump).chain())
         //.add_observer(friction)
         .add_observer(register_input_map);
 }
@@ -301,26 +301,24 @@ fn jump(
     atlas.index = 5;
 }
 fn move_mario(
-    mario: Single<(&mut KinematicController, Option<&Grounded>), With<Mario>>,
+    mario: Single<(&mut KinematicController, &MoveStats, Option<&Grounded>), With<Mario>>,
     inputs: Single<&ActionValue, With<Action<Move>>>,
+    run: Single<&ActionState, With<Action<Run>>>,
     time: Res<Time>,
 ) {
-    let (mut vel, grounded) = mario.into_inner();
-    match inputs.into_inner() {
-        &ActionValue::Axis1D(axis) => {
-            let mut speed = 650.0;
-            if grounded.is_none() {
-                speed = 0.0;
-            }
-            if axis != 0.0 {
-                speed = 350.0;
-            }
-            vel.velocity = vel
-                .velocity
-                .move_towards(vec2(axis * 50.0, vel.velocity.y), time.delta_secs() * speed);
-        }
-        _ => (),
+    let (mut vel, stats, grounded) = mario.into_inner();
+    let &ActionValue::Axis1D(axis) = inputs.into_inner() else { return };
+    let speed = if *run.into_inner() == ActionState::Fired { stats.run_speed } else { stats.move_speed };
+    let mut accel = 650.0;
+    if grounded.is_none() {
+        accel = 0.0;
     }
+    if axis != 0.0 {
+        accel = 350.0;
+    }
+    vel.velocity = vel
+        .velocity
+        .move_towards(vec2(axis * speed, vel.velocity.y), time.delta_secs() * accel);
 }
 fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands.spawn((

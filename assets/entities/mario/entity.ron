@@ -6,6 +6,6 @@
     ),
     move_stats: (
            move_speed: 75.0,
-           sprint_speed: 135.0,
+           run_speed: 135.0,
     )
 )

@@ -1,7 +1,6 @@
 //! Development tools for the game. This plugin is only enabled in dev builds.
 
 use crate::screens::Screen;
-use avian2d::prelude::PhysicsDebugPlugin;
 use bevy::{
     dev_tools::states::log_transitions, input::common_conditions::input_just_pressed, prelude::*,
 };
@@ -20,7 +19,7 @@ pub(super) fn plugin(app: &mut App) {
     app.add_plugins((
         EguiPlugin::default(),
         bevy_inspector_egui::quick::WorldInspectorPlugin::new(),
-        PhysicsDebugPlugin::default(),
+        //PhysicsDebugPlugin::default(),
     ));
 }
 
