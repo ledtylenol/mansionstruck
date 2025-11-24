@@ -115,8 +115,7 @@ pub struct PlayerBundle {
 pub struct ColliderBuilder {
     pub collider: ColliderShape,
     pub rb: RigidBody,
-    //TODO remove this as we dont use it
-    pub velocity: LinearVelocity,
+    pub shape_caster: ShapeCasterBuilder,
     pub jump_stats: JumpStats,
     #[serde(default)]
     pub rotation_constraints: LockedAxes,
@@ -130,11 +129,30 @@ pub struct ColliderBuilder {
 pub struct ColliderBundle {
     pub collider: Collider,
     pub rb: RigidBody,
-    pub velocity: LinearVelocity,
+    pub shape_caster: ShapeCaster,
     pub jump_stats: JumpStats,
     pub rotation_constraints: LockedAxes,
     pub gravity_scale: GravityScale,
     pub friction: Friction,
+}
+#[derive(Deserialize, Clone)]
+pub struct ShapeCasterBuilder {
+    pub dir: Dir2,
+    pub distance: f32,
+}
+
+impl ShapeCasterBuilder {
+    fn to_shape_cast(&self, collider: &Collider) -> ShapeCaster {
+        ShapeCaster::new(collider.clone(), Vec2::ZERO, 0.0, self.dir).with_max_distance(self.distance)
+    }
+}
+impl Default for ShapeCasterBuilder {
+    fn default() -> Self {
+        Self {
+            dir: Dir2::from_xy_unchecked(0.0, -1.0),
+            distance: 1.0,
+        }
+    }
 }
 impl From<ColliderBuilder> for ColliderBundle {
     fn from(
@@ -142,7 +160,7 @@ impl From<ColliderBuilder> for ColliderBundle {
         ColliderBuilder {
             collider,
             rb,
-            velocity,
+            shape_caster,
             jump_stats,
             rotation_constraints,
             gravity_scale,
@@ -150,10 +168,11 @@ impl From<ColliderBuilder> for ColliderBundle {
         }: ColliderBuilder,
     ) -> Self {
         let collider = collider.into();
+        let shape_caster = shape_caster.to_shape_cast(&collider);
         Self {
             collider,
             rb,
-            velocity,
+            shape_caster,
             jump_stats,
             rotation_constraints,
             gravity_scale,
@@ -202,13 +221,10 @@ pub(crate) fn plugin(app: &mut App) {
 }
 
 fn update_sprite(
-    mario: Single<(&mut Sprite, &mut Mario, &Transform, Option<&Grounded>)>,
-    input: Single<&ActionValue, With<Action<Move>>>,
+    mario: Single<(&mut Sprite, &mut Mario, &Transform, &KinematicController, Option<&Grounded>)>,
 ) {
-    let (mut sprite, mut mario, tf, grounded) = mario.into_inner();
-    let &ActionValue::Axis1D(axis) = input.into_inner() else {
-        return;
-    };
+    let (mut sprite, mut mario, tf, controller, grounded) = mario.into_inner();
+    let axis = controller.velocity.x;
     if grounded.is_some() {
         let Some(atlas) = &mut sprite.texture_atlas else {
             return;
@@ -230,12 +246,15 @@ fn update_sprite(
     mario.last_pos = tf.translation.x;
 }
 fn jump(
-    _jump: On<Fire<Jump>>,
-    mario: Single<(&mut KinematicController, &mut Mario, &mut JumpStats), With<Grounded>>,
+    _jump: On<Start<Jump>>,
+    mario: Single<(&mut KinematicController, &mut Mario, &mut JumpStats, &mut Sprite), With<Grounded>>,
 ) {
-    let (mut controller, mut mario, mut stats) = mario.into_inner();
+    let (mut controller, mut mario, mut stats, mut sprite) = mario.into_inner();
     controller.velocity.y = stats.get_jump_velocity();
     mario.time_since_space = 0.0;
+    //if we dont have an atlas something went very very wrong
+    let Some(atlas) = &mut sprite.texture_atlas else { return; };
+    atlas.index = 5;
 }
 fn move_mario(
     mario: Single<(&mut KinematicController, Option<&Grounded>), With<Mario>>,

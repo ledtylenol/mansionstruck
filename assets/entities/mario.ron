@@ -1,12 +1,16 @@
 (
-    collider: Capsule(14., 8.),
+    collider: Cuboid(15., 15.),
     rb: Kinematic,
     velocity: LinearVelocity(Vec2(0., 0.)),
     rotation_constraints: LockedAxes(0b111),
     gravity_scale: GravityScale(1.),
     jump_stats: (
            jump_height: 80.0,
-           jump_time: 1.0,
-           fall_time: 1.0,
+           jump_time: 0.5,
+           fall_time: 0.5,
     ),
+    shape_caster: (
+        dir: Dir2(Vec2(0.0, -1.0)),
+        distance: 1.0,
+    )
 )

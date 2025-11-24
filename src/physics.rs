@@ -2,9 +2,11 @@ use crate::char_controller::prelude::*;
 use crate::mario::{JumpStats, Mario};
 use avian2d::math::{AdjustPrecision, AsF32};
 use avian2d::prelude::*;
+use bevy::color::palettes::tailwind;
 use bevy::platform::collections::HashSet;
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
+use std::f32::consts::PI;
 
 #[derive(Component)]
 pub struct Grounded;
@@ -58,31 +60,16 @@ impl Default for ColliderShape {
     }
 }
 fn check_grounded(
-    char: Query<(Entity, &Collider, &Transform, Option<&Grounded>)>,
-    move_and_slide: MoveAndSlide,
+    char: Query<(Entity, &ShapeHits)>,
     mut commands: Commands,
 ) {
-    for (entity, collider, transform, grounded) in char.iter() {
-        let velocity = vec2(0.0, -1.0);
-        let filter = SpatialQueryFilter::from_excluded_entities([entity]);
-        let out = move_and_slide.cast_move(
-            collider,
-            transform.translation.xy().adjust_precision(),
-            transform
-                .rotation
-                .to_euler(EulerRot::XYZ)
-                .2
-                .adjust_precision(),
-            velocity,
-            MoveAndSlideConfig::default().skin_width,
-            &filter,
-        );
-        if out.is_none() && grounded.is_some() {
-            commands.entity(entity).remove::<Grounded>();
-            info!("removing grounded for entity {entity}");
-        } else if out.is_some() && grounded.is_none() {
-            info!("applying grounded to entity {entity}");
+    for (entity, hits) in char.iter() {
+        let is_grounded = hits.iter().count() > 0;
+
+        if is_grounded {
             commands.entity(entity).insert(Grounded);
+        } else {
+            commands.entity(entity).remove::<Grounded>();
         }
     }
 }
@@ -90,6 +77,7 @@ fn perform_move_and_slide(
     mut char: Query<(Entity, &Collider, &mut KinematicController, &mut Transform)>,
     move_and_slide: MoveAndSlide,
     time: Res<Time>,
+    mut gizmos: Gizmos,
 ) {
     for (entity, collider, mut controller, mut transform) in char.iter_mut() {
         let velocity = controller.velocity;
@@ -109,6 +97,22 @@ fn perform_move_and_slide(
             &filter,
             |hit| {
                 collisions.insert(hit.entity);
+                if hit.intersects() {
+                    gizmos.circle_2d(
+                        Isometry2d::from_translation(transform.translation.xy()),
+                        33.0,
+                        tailwind::RED_600,
+                    );
+                } else {
+                    gizmos.arrow_2d(
+                        hit.point.f32(),
+                        (hit.point
+                            + hit.normal.adjust_precision() * hit.collision_distance
+                            / time.delta_secs().adjust_precision())
+                            .f32(),
+                        tailwind::EMERALD_400,
+                    );
+                }
                 true
             },
         );
