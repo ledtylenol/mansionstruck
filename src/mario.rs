@@ -172,6 +172,7 @@ pub struct ColliderBundle {
     pub rotation_constraints: LockedAxes,
     pub gravity_scale: GravityScale,
     pub friction: Friction,
+    pub grounded: Grounded,
 }
 #[derive(Deserialize, Clone)]
 pub struct ShapeCasterBuilder {
@@ -213,6 +214,7 @@ impl From<ColliderBuilder> for ColliderBundle {
             rotation_constraints,
             gravity_scale,
             friction,
+            ..default()
         }
     }
 }
@@ -245,7 +247,7 @@ pub struct GoalBundle {
 
 pub(crate) fn plugin(app: &mut App) {
     app.add_plugins(LdtkPlugin)
-        .add_plugins(super::walls::WallPlugin)
+        .add_plugins((super::walls::WallPlugin, crate::camera::plugin))
         .insert_resource(LevelSelection::index(0))
         .register_ldtk_entity::<PlayerBundle>("Mario")
         .register_ldtk_entity::<GoalBundle>("Goal")
@@ -256,11 +258,11 @@ pub(crate) fn plugin(app: &mut App) {
 }
 
 fn update_sprite(
-    mario: Single<(&mut Sprite, &mut Mario, &Transform, &KinematicController, Option<&Grounded>)>,
+    mario: Single<(&mut Sprite, &mut Mario, &Transform, &KinematicController, &Grounded)>,
 ) {
     let (mut sprite, mut mario, tf, controller, grounded) = mario.into_inner();
     let axis = controller.velocity.x;
-    if grounded.is_some() {
+    if grounded.0 == 0.0 {
         let Some(atlas) = &mut sprite.texture_atlas else {
             return;
         };
@@ -282,26 +284,29 @@ fn update_sprite(
 }
 fn jump(
     jump: Single<(&ActionState, &ActionTime), With<Action<Jump>>>,
-    mario: Single<(&mut KinematicController, &mut Mario, &mut JumpStats, &mut Sprite), With<Grounded>>,
+    mario: Single<(&mut KinematicController, &mut Mario, &mut JumpStats, &mut Sprite, &mut Grounded)>,
     time: Res<Time>,
 ) {
-    //don't jump if it's been 0.1s
-    let (mut controller, mut mario, mut stats, mut sprite) = mario.into_inner();
+    let (mut controller, mut mario, mut stats, mut sprite, mut grounded) = mario.into_inner();
     let (&state, &ActionTime { elapsed_secs, .. }) = jump.into_inner();
     if state != ActionState::None && elapsed_secs < 0.1 {
         mario.time_since_space = 0.0;
     } else {
         mario.time_since_space += time.delta_secs();
     }
+    //don't jump if it's been 0.1s
+    //TODO: hardcoded for now, make them components?
     if mario.time_since_space >= 0.1 { return; }
+    if grounded.0 > 0.1 { return; }
     controller.velocity.y = stats.get_jump_velocity();
     mario.time_since_space = 0.1;
+    grounded.0 = 0.1;
     //if we dont have an atlas something went very very wrong
     let Some(atlas) = &mut sprite.texture_atlas else { return; };
     atlas.index = 5;
 }
 fn move_mario(
-    mario: Single<(&mut KinematicController, &MoveStats, Option<&Grounded>), With<Mario>>,
+    mario: Single<(&mut KinematicController, &MoveStats, &Grounded), With<Mario>>,
     inputs: Single<&ActionValue, With<Action<Move>>>,
     run: Single<&ActionState, With<Action<Run>>>,
     time: Res<Time>,
@@ -310,7 +315,7 @@ fn move_mario(
     let &ActionValue::Axis1D(axis) = inputs.into_inner() else { return };
     let speed = if *run.into_inner() == ActionState::Fired { stats.run_speed } else { stats.move_speed };
     let mut accel = 650.0;
-    if grounded.is_none() {
+    if grounded.0 > 0.0 {
         accel = 0.0;
     }
     if axis != 0.0 {

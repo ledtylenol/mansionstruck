@@ -8,8 +8,8 @@ use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::f32::consts::PI;
 
-#[derive(Component)]
-pub struct Grounded;
+#[derive(Component, Default, Clone, Copy)]
+pub struct Grounded(pub f32);
 #[derive(Clone, Copy, Deserialize, Serialize)]
 pub enum ColliderShape {
     Ball(f32),
@@ -30,10 +30,11 @@ pub(crate) fn plugin(app: &mut App) {
 }
 
 pub fn apply_gravity(
-    mut kinematics: Query<(&mut KinematicController, Option<&GravityScale>, Option<&mut JumpStats>), Without<Grounded>>,
+    mut kinematics: Query<(&mut KinematicController, Option<&GravityScale>, Option<&mut JumpStats>, &Grounded)>,
     time: Res<Time>,
 ) {
-    for (mut controller, scale, stats) in kinematics.iter_mut() {
+    for (mut controller, scale, stats, grounded) in kinematics.iter_mut() {
+        if grounded.0 == 0.0 { continue; }
         let mut gravity = match stats {
             Some(mut t) => t.get_gravity(controller.velocity.y),
             None => JumpStats::default().get_gravity(controller.velocity.y),
@@ -60,16 +61,17 @@ impl Default for ColliderShape {
     }
 }
 fn check_grounded(
-    char: Query<(Entity, &ShapeHits)>,
+    mut char: Query<(Entity, &ShapeHits, Option<&mut Grounded>)>,
     mut commands: Commands,
+    time: Res<Time>,
 ) {
-    for (entity, hits) in char.iter() {
+    for (entity, hits, grounded) in char.iter_mut() {
         let is_grounded = hits.iter().count() > 0;
 
         if is_grounded {
-            commands.entity(entity).insert(Grounded);
-        } else {
-            commands.entity(entity).remove::<Grounded>();
+            commands.entity(entity).insert(Grounded(0.0));
+        } else if let Some(mut grounded) = grounded {
+            grounded.0 += time.delta_secs();
         }
     }
 }
