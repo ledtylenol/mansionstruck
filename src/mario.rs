@@ -265,7 +265,7 @@ pub(crate) fn plugin(app: &mut App) {
         .register_ldtk_entity::<PlayerBundle>("Mario")
         .register_ldtk_entity::<GoalBundle>("Goal")
         .add_systems(Startup, setup)
-        .add_systems(Update, (move_mario, jump, update_sprite).chain())
+        .add_systems(Update, (move_mario, jump, update_sprite, update_mario_gravity).chain())
         //.add_observer(friction)
         .add_observer(register_input_map);
 }
@@ -321,6 +321,20 @@ fn jump(
     time_since.time = 0.1;
     //if we dont have an atlas something went very very wrong
     mario.jumped = true;
+}
+
+fn update_mario_gravity(
+    mut query: Query<(&mut GravityScale, &KinematicController), (With<Mario>, Without<Grounded>)>,
+    jump_query: Query<&mut ActionState, With<Action<Jump>>>,
+) {
+    let jump_pressed = jump_query.iter().any(|&jump| jump == ActionState::Fired);
+    for (mut scale, controller) in query.iter_mut() {
+        if (!jump_pressed && controller.velocity.y > 0.0) {
+            scale.0 = 2.0;
+        } else {
+            scale.0 = 1.0;
+        }
+    }
 }
 fn move_mario(
     mario: Single<(&mut KinematicController, &MoveStats, Option<&Grounded>), With<Mario>>,
