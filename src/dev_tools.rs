@@ -1,30 +1,27 @@
 //! Development tools for the game. This plugin is only enabled in dev builds.
 
 use crate::screens::Screen;
+use bevy::input::common_conditions::input_toggle_active;
 use bevy::{
-    dev_tools::states::log_transitions, input::common_conditions::input_just_pressed, prelude::*,
+    dev_tools::states::log_transitions, prelude::*,
 };
-use bevy_inspector_egui::bevy_egui::EguiPlugin;
+use bevy_inspector_egui::bevy_egui::{EguiContext, EguiPlugin, PrimaryEguiContext};
 
 pub(super) fn plugin(app: &mut App) {
     // Log `Screen` state transitions.
     app.add_systems(Update, log_transitions::<Screen>);
 
     // Toggle the debug overlay for UI.
-    app.add_systems(
-        Update,
-        toggle_debug_ui.run_if(input_just_pressed(TOGGLE_KEY)),
-    );
     //inspect stuff and things
     app.add_plugins((
         EguiPlugin::default(),
-        bevy_inspector_egui::quick::WorldInspectorPlugin::new(),
+        bevy_inspector_egui::quick::WorldInspectorPlugin::new().run_if(input_toggle_active(false, TOGGLE_KEY)),
         //PhysicsDebugPlugin::default(),
     ));
 }
 
 const TOGGLE_KEY: KeyCode = KeyCode::Backquote;
 
-fn toggle_debug_ui(mut options: ResMut<UiDebugOptions>) {
+fn toggle_debug_ui(mut options: ResMut<UiDebugOptions>, mut egui: Single<&mut EguiContext, With<PrimaryEguiContext>>) {
     options.toggle();
 }

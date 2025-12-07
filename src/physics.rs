@@ -7,9 +7,10 @@ use bevy::platform::collections::HashSet;
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::f32::consts::PI;
+use std::marker::PhantomData;
 
-#[derive(Component, Default, Clone, Copy)]
-pub struct Grounded(pub f32);
+#[derive(Component, Default, Clone, Copy, Reflect)]
+pub struct Grounded;
 #[derive(Clone, Copy, Deserialize, Serialize)]
 pub enum ColliderShape {
     Ball(f32),
@@ -21,20 +22,29 @@ pub enum ColliderShape {
 pub struct KinematicController {
     pub velocity: Vec2,
 }
+#[derive(Component, Copy, Clone, Debug, Reflect, Default, Deserialize)]
+#[reflect(Component)]
+pub struct TimeSince<T> {
+    pub time: f32,
+    //for generics
+    #[reflect(ignore)]
+    _phantom: PhantomData<T>,
+}
 pub(crate) fn plugin(app: &mut App) {
     app.add_plugins(PhysicsPlugins::default().with_length_unit(10.0))
         .add_systems(
             FixedUpdate,
-            (check_grounded, apply_gravity, perform_move_and_slide).chain(),
-        );
+            (check_grounded, update_time_since, apply_gravity, perform_move_and_slide).chain(),
+        )
+        .register_type::<TimeSince<Grounded>>()
+    ;
 }
 
 pub fn apply_gravity(
-    mut kinematics: Query<(&mut KinematicController, Option<&GravityScale>, Option<&mut JumpStats>, &Grounded)>,
+    mut kinematics: Query<(&mut KinematicController, Option<&GravityScale>, Option<&mut JumpStats>), Without<Grounded>>,
     time: Res<Time>,
 ) {
-    for (mut controller, scale, stats, grounded) in kinematics.iter_mut() {
-        if grounded.0 == 0.0 { continue; }
+    for (mut controller, scale, stats) in kinematics.iter_mut() {
         let mut gravity = match stats {
             Some(mut t) => t.get_gravity(controller.velocity.y),
             None => JumpStats::default().get_gravity(controller.velocity.y),
@@ -61,17 +71,25 @@ impl Default for ColliderShape {
     }
 }
 fn check_grounded(
-    mut char: Query<(Entity, &ShapeHits, Option<&mut Grounded>)>,
+    mut char: Query<(Entity, &ShapeHits)>,
     mut commands: Commands,
-    time: Res<Time>,
 ) {
-    for (entity, hits, grounded) in char.iter_mut() {
+    for (entity, hits) in char.iter_mut() {
         let is_grounded = hits.iter().count() > 0;
 
         if is_grounded {
-            commands.entity(entity).insert(Grounded(0.0));
-        } else if let Some(mut grounded) = grounded {
-            grounded.0 += time.delta_secs();
+            commands.entity(entity).insert(Grounded);
+        } else {
+            commands.entity(entity).try_remove::<Grounded>();
+        }
+    }
+}
+fn update_time_since(mut query: Query<(&mut TimeSince<Grounded>, Option<&Grounded>)>, time: Res<Time>) {
+    for (mut time_since, grounded) in query.iter_mut() {
+        if grounded.is_some() {
+            time_since.time = 0.0;
+        } else {
+            time_since.time += time.delta_secs();
         }
     }
 }

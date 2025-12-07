@@ -1,5 +1,5 @@
 use crate::input::{Crouch, InputSettings, Jump, Move, Run};
-use crate::physics::{ColliderShape, Grounded, KinematicController};
+use crate::physics::{ColliderShape, Grounded, KinematicController, TimeSince};
 use avian2d::prelude::*;
 use bevy::prelude::*;
 use bevy_ecs_ldtk::prelude::*;
@@ -7,11 +7,22 @@ use bevy_enhanced_input::prelude::*;
 use serde::Deserialize;
 use std::fs::read_to_string;
 
-#[derive(Component, Default, Reflect, Deserialize)]
+#[derive(Component, Reflect, Deserialize)]
 pub struct Mario {
     pub time_since_space: f32,
     pub last_pos: f32,
     pub horizontal_dist: f32,
+    pub jumped: bool,
+}
+impl Default for Mario {
+    fn default() -> Self {
+        Self {
+            time_since_space: 1000.0,
+            last_pos: 0.0,
+            horizontal_dist: 0.0,
+            jumped: false,
+        }
+    }
 }
 
 impl Mario {
@@ -129,6 +140,8 @@ pub struct MarioBundle {
     pub mario: Mario,
     pub move_stats: MoveStats,
     pub jump_stats: JumpStats,
+    #[serde(default)]
+    pub time_since: TimeSince<Grounded>,
 }
 impl From<&EntityInstance> for MarioBundle {
     fn from(entity_instance: &EntityInstance) -> Self {
@@ -252,20 +265,20 @@ pub(crate) fn plugin(app: &mut App) {
         .register_ldtk_entity::<PlayerBundle>("Mario")
         .register_ldtk_entity::<GoalBundle>("Goal")
         .add_systems(Startup, setup)
-        .add_systems(Update, (move_mario, update_sprite, jump).chain())
+        .add_systems(Update, (move_mario, jump, update_sprite).chain())
         //.add_observer(friction)
         .add_observer(register_input_map);
 }
 
 fn update_sprite(
-    mario: Single<(&mut Sprite, &mut Mario, &Transform, &KinematicController, &Grounded)>,
+    mario: Single<(&mut Sprite, &mut Mario, &Transform, &KinematicController, Option<&Grounded>)>,
 ) {
     let (mut sprite, mut mario, tf, controller, grounded) = mario.into_inner();
     let axis = controller.velocity.x;
-    if grounded.0 == 0.0 {
-        let Some(atlas) = &mut sprite.texture_atlas else {
-            return;
-        };
+    let Some(atlas) = &mut sprite.texture_atlas else {
+        return;
+    };
+    if grounded.is_some() {
         if axis != 0.0 {
             mario.horizontal_dist += (tf.translation.x - mario.last_pos).abs();
             if mario.horizontal_dist > 5.0 {
@@ -277,19 +290,24 @@ fn update_sprite(
             atlas.index = 0;
         }
     } else {
-        mario.horizontal_dist = 0.0
+        mario.horizontal_dist = 0.0;
+        atlas.index = 5;
     }
 
     mario.last_pos = tf.translation.x;
 }
 fn jump(
-    jump: Single<(&ActionState, &ActionTime), With<Action<Jump>>>,
-    mario: Single<(&mut KinematicController, &mut Mario, &mut JumpStats, &mut Sprite, &mut Grounded)>,
+    jump: Single<(&ActionEvents, &ActionTime), With<Action<Jump>>>,
+    mario: Single<(&mut KinematicController, &mut Mario, &mut JumpStats, &mut TimeSince<Grounded>)>,
     time: Res<Time>,
 ) {
-    let (mut controller, mut mario, mut stats, mut sprite, mut grounded) = mario.into_inner();
+    let (mut controller, mut mario, mut stats, mut time_since) = mario.into_inner();
+    if time_since.time == 0.0 && mario.jumped {
+        mario.jumped = false;
+        return;
+    }
     let (&state, &ActionTime { elapsed_secs, .. }) = jump.into_inner();
-    if state != ActionState::None && elapsed_secs < 0.1 {
+    if state.contains(ActionEvents::STARTED) || state.contains(ActionEvents::ONGOING) && elapsed_secs < 0.1 {
         mario.time_since_space = 0.0;
     } else {
         mario.time_since_space += time.delta_secs();
@@ -297,16 +315,15 @@ fn jump(
     //don't jump if it's been 0.1s
     //TODO: hardcoded for now, make them components?
     if mario.time_since_space >= 0.1 { return; }
-    if grounded.0 > 0.1 { return; }
+    if time_since.time >= 0.1 { return; }
     controller.velocity.y = stats.get_jump_velocity();
     mario.time_since_space = 0.1;
-    grounded.0 = 0.1;
+    time_since.time = 0.1;
     //if we dont have an atlas something went very very wrong
-    let Some(atlas) = &mut sprite.texture_atlas else { return; };
-    atlas.index = 5;
+    mario.jumped = true;
 }
 fn move_mario(
-    mario: Single<(&mut KinematicController, &MoveStats, &Grounded), With<Mario>>,
+    mario: Single<(&mut KinematicController, &MoveStats, Option<&Grounded>), With<Mario>>,
     inputs: Single<&ActionValue, With<Action<Move>>>,
     run: Single<&ActionState, With<Action<Run>>>,
     time: Res<Time>,
@@ -315,7 +332,7 @@ fn move_mario(
     let &ActionValue::Axis1D(axis) = inputs.into_inner() else { return };
     let speed = if *run.into_inner() == ActionState::Fired { stats.run_speed } else { stats.move_speed };
     let mut accel = 650.0;
-    if grounded.0 > 0.0 {
+    if grounded.is_none() {
         accel = 0.0;
     }
     if axis != 0.0 {
