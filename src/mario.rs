@@ -1,3 +1,4 @@
+use crate::camera::{CameraOf, FollowAxes};
 use crate::input::{Crouch, InputSettings, Jump, Move, Run};
 use crate::physics::{ColliderShape, Grounded, KinematicController, TimeSince};
 use avian2d::prelude::*;
@@ -267,7 +268,7 @@ pub(crate) fn plugin(app: &mut App) {
         .add_systems(Startup, setup)
         .add_systems(Update, (move_mario, jump, update_sprite, update_mario_gravity).chain())
         //.add_observer(friction)
-        .add_observer(register_input_map);
+        .add_observer(handle_mario_startup);
 }
 
 fn update_sprite(
@@ -357,22 +358,13 @@ fn move_mario(
         .move_towards(vec2(axis * speed, vel.velocity.y), time.delta_secs() * accel);
 }
 fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
-    commands.spawn((
-        Camera2d,
-        Projection::Orthographic(OrthographicProjection {
-            scale: 0.5,
-            ..OrthographicProjection::default_2d()
-        }),
-        Transform::from_xyz(1280.0 / 4.0, 720.0 / 4.0, 0.0),
-    ));
-
     commands.spawn(LdtkWorldBundle {
         ldtk_handle: asset_server.load("ldtk/mayrio.ldtk").into(),
         ..Default::default()
     });
 }
 
-fn register_input_map(
+fn handle_mario_startup(
     e: On<Add, Mario>,
     mut commands: Commands,
     input_settings: Res<InputSettings>,
@@ -400,4 +392,16 @@ fn register_input_map(
         )
     ]
     ));
+    commands.spawn((
+        Camera2d,
+        Projection::Orthographic(OrthographicProjection {
+            scale: 0.35,
+            scaling_mode: bevy::camera::ScalingMode::FixedVertical { viewport_height: 720.0 },
+            ..OrthographicProjection::default_2d()
+        }),
+        Transform::from_xyz(1280.0 / 4.0, 238.0, 0.0),
+        CameraOf(e.entity),
+        TransformInterpolation,
+    ));
+    commands.entity(e.entity).insert(FollowAxes::new(FollowAxes::HORIZONTAL));
 }

@@ -42,11 +42,11 @@ pub(crate) fn plugin(app: &mut App) {
 }
 
 pub fn follow_target(
-    target: Query<&Transform, With<CameraFollow>>,
-    mut follower: Query<(&mut Transform, &CameraOf, &FollowAxes), Without<CameraFollow>>,
+    target: Query<(&Transform, &FollowAxes), With<CameraFollow>>,
+    mut follower: Query<(&mut Transform, &CameraOf), Without<CameraFollow>>,
 ) {
-    for (mut transform, camera_of, axes) in follower.iter_mut() {
-        let Ok(xf) = target.get(camera_of.0) else { continue; };
+    for (mut transform, camera_of) in follower.iter_mut() {
+        let Ok((xf, axes)) = target.get(camera_of.0) else { continue; };
         if axes.has(FollowAxes::HORIZONTAL) {
             transform.translation.x = xf.translation.x;
         }

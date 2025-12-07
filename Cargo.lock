@@ -5105,6 +5105,7 @@ dependencies = [
  "bevy_ecs_ldtk",
  "bevy_enhanced_input",
  "bevy_fmod",
+ "bevy_transform_interpolation",
  "bevy_tween",
  "rand",
  "ron 0.12.0",
