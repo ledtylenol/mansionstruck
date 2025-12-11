@@ -65,91 +65,6 @@ pub struct MoveAndSlide<'w, 's> {
 }
 
 impl<'w, 's> MoveAndSlide<'w, 's> {
-    /// Moves a shape along a given velocity vector while sliding along any colliders it hits on the way.
-    ///
-    /// See [`MoveAndSlide`] for an overview of the algorithm.
-    ///
-    /// # Arguments
-    ///
-    /// - `shape`: The shape being cast represented as a [`Collider`].
-    /// - `shape_position`: Where the shape is cast from.
-    /// - `shape_rotation`: The rotation of the shape being cast.
-    /// - `velocity`: The initial velocity vector along which to move the shape. This will be modified to reflect sliding along surfaces.
-    /// - `delta_time`: The duration over which to move the shape. `velocity * delta_time` gives the total desired movement vector.
-    /// - `config`: A [`MoveAndSlideConfig`] that determines the behavior of the move and slide. [`MoveAndSlideConfig::default()`] should be a good start for most cases.
-    /// - `filter`: A [`SpatialQueryFilter`] that determines which colliders are taken into account in the query. It is highly recommended to exclude the entity holding the collider itself,
-    ///   otherwise the character will collide with itself.
-    /// - `on_hit`: A callback that is called when a collider is hit as part of the move and slide iterations. Returning `false` will abort the move and slide operation.
-    ///   Starting intersections, i.e. those that happen when the collider is already stuck in another collider, will be reported to this callback, but aborted even if the callback returns `true`.
-    ///   If you don't have any special handling per collision, you can pass `|_| true`.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use bevy::prelude::*;
-    /// use std::collections::HashSet;
-    #[cfg_attr(
-        feature = "2d",
-        doc = "use avian2d::{prelude::*, math::{Vector, AdjustPrecision as _, AsF32 as _}};"
-    )]
-    #[cfg_attr(
-        feature = "3d",
-        doc = "use avian3d::{prelude::*, math::{Vector, AdjustPrecision as _, AsF32 as _}};"
-    )]
-    ///
-    /// #[derive(Component)]
-    /// struct CharacterController {
-    ///     velocity: Vector,
-    /// }
-    ///
-    /// fn perform_move_and_slide(
-    ///     player: Single<(Entity, &Collider, &mut CharacterController, &mut Transform)>,
-    ///     move_and_slide: MoveAndSlide,
-    ///     time: Res<Time>
-    /// ) {
-    ///     let (entity, collider, mut controller, mut transform) = player.into_inner();
-    ///     let velocity = controller.velocity + Vector::X * 10.0;
-    ///     let filter = SpatialQueryFilter::from_excluded_entities([entity]);
-    ///     let mut collisions = HashSet::new();
-    ///     let out = move_and_slide.move_and_slide(
-    ///         collider,
-    #[cfg_attr(
-        feature = "2d",
-        doc = "         transform.translation.xy().adjust_precision(),"
-    )]
-    #[cfg_attr(
-        feature = "3d",
-        doc = "         transform.translation.adjust_precision(),"
-    )]
-    #[cfg_attr(
-        feature = "2d",
-        doc = "         transform.rotation.to_euler(EulerRot::XYZ).2.adjust_precision(),"
-    )]
-    #[cfg_attr(
-        feature = "3d",
-        doc = "         transform.rotation.adjust_precision(),"
-    )]
-    ///         velocity,
-    ///         time.delta(),
-    ///         &MoveAndSlideConfig::default(),
-    ///         &filter,
-    ///         |hit| {
-    ///             collisions.insert(hit.entity);
-    ///             true
-    ///         },
-    ///     );
-    #[cfg_attr(
-        feature = "2d",
-        doc = "     transform.translation = out.position.f32().extend(0.0);"
-    )]
-    #[cfg_attr(
-        feature = "3d",
-        doc = "     transform.translation = out.position.f32();"
-    )]
-    ///     controller.velocity = out.projected_velocity;
-    ///     info!("Colliding with entities: {:?}", collisions);
-    /// }
-    /// ```
     #[must_use]
     #[doc(alias = "collide_and_slide")]
     #[doc(alias = "step_slide")]
@@ -303,136 +218,6 @@ impl<'w, 's> MoveAndSlide<'w, 's> {
         }
     }
 
-    /// A [shape cast](spatial_query#shapecasting) optimized for movement. Use this if you want to move a collider with a given velocity and stop so that
-    /// it keeps a distance of `skin_width` from the first collider on its path.
-    ///
-    /// This operation is most useful when you ensure that the character is not intersecting any colliders before moving. You can do so by calling [`MoveAndSlide::depenetrate_all`]
-    /// and adding the resulting offset vector to the character's position before calling this method. See the example below.
-    ///
-    /// You will often find it useful to afterwards clip the velocity so that it no longer points into the collision plane by using [`Self::project_velocity`].
-    ///
-    /// # Arguments
-    /// - `shape`: The shape being cast represented as a [`Collider`].
-    /// - `shape_position`: Where the shape is cast from.
-    /// - `shape_rotation`: The rotation of the shape being cast.
-    /// - `movement`: The direction and magnitude of the movement. If this is [`Vector::ZERO`], this method can still return `Some(MoveHitData)` if the shape started off intersecting a collider.
-    /// - `skin_width`: A [`ShapeCastConfig`] that determines the behavior of the cast.
-    /// - `filter`: A [`SpatialQueryFilter`] that determines which colliders are taken into account in the query. It is highly recommended to exclude the entity holding the collider itself,
-    ///   otherwise the character will collide with itself.
-    ///
-    /// # Returns
-    ///
-    /// - `Some(MoveHitData)` if the shape hit a collider on the way, or started off intersecting a collider.
-    /// - `None` if the shape is able to move the full distance without hitting a collider.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use bevy::prelude::*;
-    #[cfg_attr(
-        feature = "2d",
-        doc = "use avian2d::{prelude::*, math::{Vector, Dir2, AdjustPrecision as _, AsF32 as _}};"
-    )]
-    #[cfg_attr(
-        feature = "3d",
-        doc = "use avian3d::{prelude::*, math::{Vector, Dir2, AdjustPrecision as _, AsF32 as _}};"
-    )]
-    ///
-    /// #[derive(Component)]
-    /// struct CharacterController {
-    ///     velocity: Vector,
-    /// }
-    ///
-    /// fn perform_cast_move(
-    ///     player: Single<(Entity, &Collider, &mut CharacterController, &mut Transform)>,
-    ///     move_and_slide: MoveAndSlide,
-    ///     time: Res<Time>
-    /// ) {
-    ///     let (entity, collider, mut controller, mut transform) = player.into_inner();
-    ///     let filter = SpatialQueryFilter::from_excluded_entities([entity]);
-    ///     let config = MoveAndSlideConfig::default();
-    ///
-    ///     // Ensure that the character is not intersecting with any colliders.
-    ///     let offset = move_and_slide.depenetrate_all(
-    ///         collider,
-    #[cfg_attr(
-        feature = "2d",
-        doc = "         transform.translation.xy().adjust_precision(),"
-    )]
-    #[cfg_attr(
-        feature = "3d",
-        doc = "         transform.translation.adjust_precision(),"
-    )]
-    #[cfg_attr(
-        feature = "2d",
-        doc = "         transform.rotation.to_euler(EulerRot::XYZ).2.adjust_precision(),"
-    )]
-    #[cfg_attr(
-        feature = "3d",
-        doc = "         transform.rotation.adjust_precision(),"
-    )]
-    ///         &((&config).into()),
-    ///         &filter,
-    ///     );
-    #[cfg_attr(
-        feature = "2d",
-        doc = "     transform.translation += offset.f32().extend(0.0);"
-    )]
-    #[cfg_attr(feature = "3d", doc = "     transform.translation += offset.f32();")]
-    ///     let velocity = controller.velocity;
-    ///
-    ///     let hit = move_and_slide.cast_move(
-    ///         collider,
-    #[cfg_attr(
-        feature = "2d",
-        doc = "         transform.translation.xy().adjust_precision(),"
-    )]
-    #[cfg_attr(
-        feature = "3d",
-        doc = "         transform.translation.adjust_precision(),"
-    )]
-    #[cfg_attr(
-        feature = "2d",
-        doc = "         transform.rotation.to_euler(EulerRot::XYZ).2.adjust_precision(),"
-    )]
-    #[cfg_attr(
-        feature = "3d",
-        doc = "         transform.rotation.adjust_precision(),"
-    )]
-    ///         velocity * time.delta_secs().adjust_precision(),
-    ///         config.skin_width,
-    ///         &filter,
-    ///     );
-    ///     if let Some(hit) = hit {
-    ///         // We collided with something on the way. Advance as much as possible
-    #[cfg_attr(
-        feature = "2d",
-        doc = "         transform.translation += (velocity.normalize_or_zero() * hit.distance).extend(0.0).f32();"
-    )]
-    #[cfg_attr(
-        feature = "3d",
-        doc = "         transform.translation += (velocity.normalize_or_zero() * hit.distance).f32();"
-    )]
-    ///         // Then project the velocity to make sure it no longer points towards the collision plane
-    ///         controller.velocity =
-    ///             MoveAndSlide::project_velocity(velocity, &[Dir2::new_unchecked(hit.normal1.f32())])
-    ///     } else {
-    ///         // We traveled the full distance without colliding
-    #[cfg_attr(
-        feature = "2d",
-        doc = "         transform.translation += velocity.extend(0.0).f32();"
-    )]
-    #[cfg_attr(
-        feature = "3d",
-        doc = "         transform.translation += velocity.f32();"
-    )]
-    ///     }
-    /// }
-    /// ```
-    ///
-    /// # Related methods
-    ///
-    /// - [`SpatialQueryPipeline::cast_shape`]
     #[must_use]
     #[doc(alias = "sweep")]
     pub fn cast_move(
@@ -478,79 +263,7 @@ impl<'w, 's> MoveAndSlide<'w, 's> {
         let skin_distance = skin_width / dot;
         (hit.distance - skin_distance).max(0.0)
     }
-
-    /// Moves a collider so that it no longer intersects any other collider and keeps a minimum distance of [`DepenetrationConfig::skin_width`] to all.
-    ///
-    /// Depenetration is an iterative process that solves penetrations for all planes bit-by-bit, until we either reached [`MoveAndSlideConfig::move_and_slide_iterations`]
-    /// or the accumulated error is less than [`MoveAndSlideConfig::max_depenetration_error`]. If the max iterations were reached before the error was below the threshold,
-    /// the current best attempt is returned, in which case the collider may still be intersecting with other colliders.
-    ///
-    /// This method is equivalent to calling [`Self::depenetrate`] with the results of [`Self::intersections`].
-    ///
-    /// # Arguments
-    ///
-    /// - `shape`: The shape that intersections are tested against represented as a [`Collider`].
-    /// - `shape_position`: The position of the shape.
-    /// - `shape_rotation`: The rotation of the shape.
-    /// - `filter`: A [`SpatialQueryFilter`] that determines which colliders are taken into account in the query.
-    /// - `prediction_distance`: An extra margin applied to the [`Collider`].
-    /// - `callback`: A callback that is called for each intersection found. The callback receives the deepest contact point and the contact normal.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use bevy::prelude::*;
-    #[cfg_attr(
-        feature = "2d",
-        doc = "use avian2d::{prelude::*, character_controller::move_and_slide::DepenetrationConfig, math::{AdjustPrecision as _, AsF32 as _}};"
-    )]
-    #[cfg_attr(
-        feature = "3d",
-        doc = "use avian3d::{prelude::*, character_controller::move_and_slide::DepenetrationConfig, math::{AdjustPrecision as _, AsF32 as _}};"
-    )]
-    /// fn depenetrate_player(
-    ///     player: Single<(Entity, &Collider, &mut Transform)>,
-    ///     move_and_slide: MoveAndSlide,
-    ///     time: Res<Time>
-    /// ) {
-    ///     let (entity, collider, mut transform) = player.into_inner();
-    ///     let filter = SpatialQueryFilter::from_excluded_entities([entity]);
-    ///
-    ///     let offset = move_and_slide.depenetrate_all(
-    ///         collider,
-    #[cfg_attr(
-        feature = "2d",
-        doc = "         transform.translation.xy().adjust_precision(),"
-    )]
-    #[cfg_attr(
-        feature = "3d",
-        doc = "         transform.translation.adjust_precision(),"
-    )]
-    #[cfg_attr(
-        feature = "2d",
-        doc = "         transform.rotation.to_euler(EulerRot::XYZ).2.adjust_precision(),"
-    )]
-    #[cfg_attr(
-        feature = "3d",
-        doc = "         transform.rotation.adjust_precision(),"
-    )]
-    ///         &DepenetrationConfig::default(),
-    ///         &filter,
-    ///     );
-    #[cfg_attr(
-        feature = "2d",
-        doc = "     transform.translation += offset.f32().extend(0.0);"
-    )]
-    #[cfg_attr(feature = "3d", doc = "     transform.translation += offset.f32();")]
-    /// }
-    /// ```
-    ///
-    /// See also [`MoveAndSlide::cast_move`] for a typical usage scenario.
-    ///
-    /// # Related methods
-    ///
-    /// - [`MoveAndSlide::intersections`]
-    /// - [`MoveAndSlide::depenetrate`]
+    #[allow(unused)]
     pub fn depenetrate_all(
         &self,
         shape: &Collider,
@@ -663,14 +376,6 @@ impl<'w, 's> MoveAndSlide<'w, 's> {
     ///
     /// ```
     /// use bevy::prelude::*;
-    #[cfg_attr(
-        feature = "2d",
-        doc = "use avian2d::{prelude::*, character_controller::move_and_slide::DepenetrationConfig, math::{AdjustPrecision as _, AsF32 as _}};"
-    )]
-    #[cfg_attr(
-        feature = "3d",
-        doc = "use avian3d::{prelude::*, character_controller::move_and_slide::DepenetrationConfig, math::{AdjustPrecision as _, AsF32 as _}};"
-    )]
     /// fn depenetrate_player_manually(
     ///     player: Single<(Entity, &Collider, &mut Transform)>,
     ///     move_and_slide: MoveAndSlide,
@@ -683,42 +388,6 @@ impl<'w, 's> MoveAndSlide<'w, 's> {
     ///     let mut intersections = Vec::new();
     ///     move_and_slide.intersections(
     ///         collider,
-    #[cfg_attr(
-        feature = "2d",
-        doc = "         transform.translation.xy().adjust_precision(),"
-    )]
-    #[cfg_attr(
-        feature = "3d",
-        doc = "         transform.translation.adjust_precision(),"
-    )]
-    #[cfg_attr(
-        feature = "2d",
-        doc = "         transform.rotation.to_euler(EulerRot::XYZ).2.adjust_precision(),"
-    )]
-    #[cfg_attr(
-        feature = "3d",
-        doc = "         transform.rotation.adjust_precision(),"
-    )]
-    ///         config.skin_width,
-    ///         &filter,
-    ///         |contact_point, normal| {
-    ///             intersections.push((normal, contact_point.penetration + config.skin_width));
-    ///             true
-    ///         },
-    ///     );
-    ///     let offset = move_and_slide.depenetrate(&config, &intersections);
-    #[cfg_attr(
-        feature = "2d",
-        doc = "     transform.translation += offset.f32().extend(0.0);"
-    )]
-    #[cfg_attr(feature = "3d", doc = "     transform.translation += offset.f32();")]
-    /// }
-    /// ```
-    ///
-    /// # Related methods
-    ///
-    /// - [`MoveAndSlide::intersections`]
-    /// - [`MoveAndSlide::depenetrate_all`]
     #[must_use]
     pub fn depenetrate(
         &self,
@@ -796,41 +465,6 @@ impl<'w, 's> MoveAndSlide<'w, 's> {
             }
         }
 
-        // Case 2b: Edge projections (two-plane active set)
-        // TODO: Can we optimize this from O(n^3) to O(n^2)?
-        #[cfg(feature = "3d")]
-        {
-            let n = normals.len();
-            for i in 0..n {
-                let ni = normals[i].adjust_precision();
-                for nj in normals
-                    .iter()
-                    .take(n)
-                    .skip(i + 1)
-                    .map(|n| n.adjust_precision())
-                {
-                    // Compute edge direction e = ni x nj
-                    let e = ni.cross(nj);
-                    let e_length_sq = e.length_squared();
-                    if e_length_sq < DOT_EPSILON {
-                        // Nearly parallel edge
-                        continue;
-                    }
-
-                    // Project v onto the line spanned by e:
-                    // projection = ((v·e) / |e|²) e
-                    let projection = e * (v.dot(e) / e_length_sq);
-
-                    // Check if better than previous best and valid
-                    let distance_sq = v.distance_squared(projection);
-                    if distance_sq < best_distance_sq && is_valid(projection) {
-                        best_distance_sq = distance_sq;
-                        best_projection = projection;
-                    }
-                }
-            }
-        }
-
         // Case 3: If no candidate is found, the projection is at the apex (the origin)
         if best_distance_sq.is_infinite() {
             Vector::ZERO
@@ -884,9 +518,8 @@ impl<'a> MoveAndSlideHitData<'a> {
 }
 
 /// Data related to a hit during a [`MoveAndSlide::cast_move`].
-#[derive(Clone, Copy, Debug, PartialEq, Reflect)]
-#[cfg_attr(feature = "serialize", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "serialize", reflect(Serialize, Deserialize))]
+#[derive(Clone, Copy, Debug, PartialEq, Reflect, serde::Deserialize, serde::Serialize)]
+#[reflect(Serialize, Deserialize)]
 #[reflect(Debug, PartialEq)]
 pub struct MoveHitData {
     /// The entity of the collider that was hit by the shape.
@@ -934,10 +567,8 @@ impl MoveHitData {
 }
 
 /// Configuration for a [`MoveAndSlide::move_and_slide`].
-#[derive(Clone, Debug, PartialEq, Reflect)]
-#[cfg_attr(feature = "serialize", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "serialize", reflect(Serialize, Deserialize))]
-#[reflect(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Reflect, serde::Deserialize, serde::Serialize)]
+#[reflect(Debug, PartialEq, Serialize, Deserialize)]
 pub struct MoveAndSlideConfig {
     /// How many iterations to use when moving the character. A single iteration consists of
     /// - Performing depenetration
@@ -986,10 +617,8 @@ pub struct MoveAndSlideConfig {
 }
 
 /// Configuration for a [`MoveAndSlide::depenetrate`].
-#[derive(Clone, Debug, PartialEq, Reflect)]
-#[cfg_attr(feature = "serialize", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "serialize", reflect(Serialize, Deserialize))]
-#[reflect(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Reflect, serde::Deserialize, serde::Serialize)]
+#[reflect(Debug, PartialEq, Serialize, Deserialize)]
 pub struct DepenetrationConfig {
     /// How many iterations to use when performing depenetration.
     /// Depenetration is an iterative process that solves penetrations for all planes bit-by-bit,
@@ -1044,10 +673,8 @@ impl From<&MoveAndSlideConfig> for DepenetrationConfig {
 }
 
 /// Output from a [`MoveAndSlide::move_and_slide`].
-#[derive(Clone, Copy, Debug, PartialEq, Reflect)]
-#[cfg_attr(feature = "serialize", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "serialize", reflect(Serialize, Deserialize))]
-#[reflect(Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Reflect, serde::Deserialize, serde::Serialize)]
+#[reflect(Debug, PartialEq, Serialize, Deserialize)]
 pub struct MoveAndSlideOutput {
     /// The final position of the character after move and slide. Set your [`Transform::translation`] to this value.
     pub position: Vector,

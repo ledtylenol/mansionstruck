@@ -43,6 +43,7 @@ pub struct JumpStats {
     #[serde(default)]
     fall_gravity: Option<f32>,
 }
+
 impl JumpStats {
     pub fn new(jump_height: f32, jump_time: f32, fall_time: f32) -> Self {
         let jump_velocity = Some((2.0 * jump_height) / jump_time);
@@ -196,7 +197,8 @@ pub struct ShapeCasterBuilder {
 
 impl ShapeCasterBuilder {
     fn to_shape_cast(&self, collider: &Collider) -> ShapeCaster {
-        ShapeCaster::new(collider.clone(), Vec2::ZERO, 0.0, self.dir).with_max_distance(self.distance)
+        ShapeCaster::new(collider.clone(), Vec2::ZERO, 0.0, self.dir)
+            .with_max_distance(self.distance)
     }
 }
 impl Default for ShapeCasterBuilder {
@@ -266,13 +268,22 @@ pub(crate) fn plugin(app: &mut App) {
         .register_ldtk_entity::<PlayerBundle>("Mario")
         .register_ldtk_entity::<GoalBundle>("Goal")
         .add_systems(Startup, setup)
-        .add_systems(Update, (move_mario, jump, update_sprite, update_mario_gravity).chain())
+        .add_systems(
+            Update,
+            (move_mario, jump, update_sprite, update_mario_gravity).chain(),
+        )
         //.add_observer(friction)
         .add_observer(handle_mario_startup);
 }
 
 fn update_sprite(
-    mario: Single<(&mut Sprite, &mut Mario, &Transform, &KinematicController, Option<&Grounded>)>,
+    mario: Single<(
+        &mut Sprite,
+        &mut Mario,
+        &Transform,
+        &KinematicController,
+        Option<&Grounded>,
+    )>,
 ) {
     let (mut sprite, mut mario, tf, controller, grounded) = mario.into_inner();
     let axis = controller.velocity.x;
@@ -299,7 +310,12 @@ fn update_sprite(
 }
 fn jump(
     jump: Single<(&ActionEvents, &ActionTime), With<Action<Jump>>>,
-    mario: Single<(&mut KinematicController, &mut Mario, &mut JumpStats, &mut TimeSince<Grounded>)>,
+    mario: Single<(
+        &mut KinematicController,
+        &mut Mario,
+        &mut JumpStats,
+        &mut TimeSince<Grounded>,
+    )>,
     time: Res<Time>,
 ) {
     let (mut controller, mut mario, mut stats, mut time_since) = mario.into_inner();
@@ -308,15 +324,21 @@ fn jump(
         return;
     }
     let (&state, &ActionTime { elapsed_secs, .. }) = jump.into_inner();
-    if state.contains(ActionEvents::STARTED) || state.contains(ActionEvents::ONGOING) && elapsed_secs < 0.1 {
+    if state.contains(ActionEvents::STARTED)
+        || state.contains(ActionEvents::ONGOING) && elapsed_secs < 0.1
+    {
         mario.time_since_space = 0.0;
     } else {
         mario.time_since_space += time.delta_secs();
     }
     //don't jump if it's been 0.1s
     //TODO: hardcoded for now, make them components?
-    if mario.time_since_space >= 0.1 { return; }
-    if time_since.time >= 0.1 { return; }
+    if mario.time_since_space >= 0.1 {
+        return;
+    }
+    if time_since.time >= 0.1 {
+        return;
+    }
     controller.velocity.y = stats.get_jump_velocity();
     mario.time_since_space = 0.1;
     time_since.time = 0.1;
@@ -330,7 +352,7 @@ fn update_mario_gravity(
 ) {
     let jump_pressed = jump_query.iter().any(|&jump| jump == ActionState::Fired);
     for (mut scale, controller) in query.iter_mut() {
-        if (!jump_pressed && controller.velocity.y > 0.0) {
+        if !jump_pressed && controller.velocity.y > 0.0 {
             scale.0 = 2.0;
         } else {
             scale.0 = 1.0;
@@ -344,8 +366,14 @@ fn move_mario(
     time: Res<Time>,
 ) {
     let (mut vel, stats, grounded) = mario.into_inner();
-    let &ActionValue::Axis1D(axis) = inputs.into_inner() else { return };
-    let speed = if *run.into_inner() == ActionState::Fired { stats.run_speed } else { stats.move_speed };
+    let &ActionValue::Axis1D(axis) = inputs.into_inner() else {
+        return;
+    };
+    let speed = if *run.into_inner() == ActionState::Fired {
+        stats.run_speed
+    } else {
+        stats.move_speed
+    };
     let mut accel = 650.0;
     if grounded.is_none() {
         accel = 0.0;
@@ -353,9 +381,10 @@ fn move_mario(
     if axis != 0.0 {
         accel = 350.0;
     }
-    vel.velocity = vel
-        .velocity
-        .move_towards(vec2(axis * speed, vel.velocity.y), time.delta_secs() * accel);
+    vel.velocity = vel.velocity.move_towards(
+        vec2(axis * speed, vel.velocity.y),
+        time.delta_secs() * accel,
+    );
 }
 fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands.spawn(LdtkWorldBundle {
@@ -396,12 +425,16 @@ fn handle_mario_startup(
         Camera2d,
         Projection::Orthographic(OrthographicProjection {
             scale: 0.35,
-            scaling_mode: bevy::camera::ScalingMode::FixedVertical { viewport_height: 720.0 },
+            scaling_mode: bevy::camera::ScalingMode::FixedVertical {
+                viewport_height: 720.0,
+            },
             ..OrthographicProjection::default_2d()
         }),
         Transform::from_xyz(1280.0 / 4.0, 238.0, 0.0),
         CameraOf(e.entity),
         TransformInterpolation,
     ));
-    commands.entity(e.entity).insert(FollowAxes::new(FollowAxes::HORIZONTAL));
+    commands
+        .entity(e.entity)
+        .insert(FollowAxes::new(FollowAxes::HORIZONTAL));
 }

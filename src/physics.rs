@@ -1,12 +1,10 @@
 use crate::char_controller::prelude::*;
-use crate::mario::{JumpStats, Mario};
+use crate::mario::JumpStats;
 use avian2d::math::{AdjustPrecision, AsF32};
 use avian2d::prelude::*;
 use bevy::color::palettes::tailwind;
-use bevy::platform::collections::HashSet;
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
-use std::f32::consts::PI;
 use std::marker::PhantomData;
 
 #[derive(Component, Default, Clone, Copy, Reflect)]
@@ -34,14 +32,26 @@ pub(crate) fn plugin(app: &mut App) {
     app.add_plugins(PhysicsPlugins::default().with_length_unit(10.0))
         .add_systems(
             FixedUpdate,
-            (check_grounded, update_time_since, apply_gravity, perform_move_and_slide).chain(),
+            (
+                check_grounded,
+                update_time_since,
+                apply_gravity,
+                perform_move_and_slide,
+            )
+                .chain(),
         )
-        .register_type::<TimeSince<Grounded>>()
-    ;
+        .register_type::<TimeSince<Grounded>>();
 }
 
 pub fn apply_gravity(
-    mut kinematics: Query<(&mut KinematicController, Option<&GravityScale>, Option<&mut JumpStats>), Without<Grounded>>,
+    mut kinematics: Query<
+        (
+            &mut KinematicController,
+            Option<&GravityScale>,
+            Option<&mut JumpStats>,
+        ),
+        Without<Grounded>,
+    >,
     time: Res<Time>,
 ) {
     for (mut controller, scale, stats) in kinematics.iter_mut() {
@@ -70,10 +80,7 @@ impl Default for ColliderShape {
         ColliderShape::Cuboid(20.0, 20.0)
     }
 }
-fn check_grounded(
-    mut char: Query<(Entity, &ShapeHits)>,
-    mut commands: Commands,
-) {
+fn check_grounded(mut char: Query<(Entity, &ShapeHits)>, mut commands: Commands) {
     for (entity, hits) in char.iter_mut() {
         let is_grounded = hits.iter().count() > 0;
 
@@ -84,7 +91,10 @@ fn check_grounded(
         }
     }
 }
-fn update_time_since(mut query: Query<(&mut TimeSince<Grounded>, Option<&Grounded>)>, time: Res<Time>) {
+fn update_time_since(
+    mut query: Query<(&mut TimeSince<Grounded>, Option<&Grounded>)>,
+    time: Res<Time>,
+) {
     for (mut time_since, grounded) in query.iter_mut() {
         if grounded.is_some() {
             time_since.time = 0.0;
@@ -97,8 +107,7 @@ fn perform_move_and_slide(
     mut char: Query<(Entity, &Collider, &mut KinematicController, &mut Transform)>,
     move_and_slide: MoveAndSlide,
     time: Res<Time>,
-    #[cfg(feature = "dev")]
-    mut gizmos: Gizmos,
+    #[cfg(feature = "dev")] mut gizmos: Gizmos,
 ) {
     for (entity, collider, mut controller, mut transform) in char.iter_mut() {
         let velocity = controller.velocity;
@@ -128,15 +137,15 @@ fn perform_move_and_slide(
                         hit.point.f32(),
                         (hit.point
                             + hit.normal.adjust_precision() * hit.collision_distance
-                            / time.delta_secs().adjust_precision())
-                            .f32(),
+                                / time.delta_secs().adjust_precision())
+                        .f32(),
                         tailwind::EMERALD_400,
                     );
                 }
                 true
             },
             #[cfg(not(feature = "dev"))]
-            |hit| { true },
+            |hit| true,
         );
         transform.translation = out.position.f32().extend(0.0);
         controller.velocity = out.projected_velocity;

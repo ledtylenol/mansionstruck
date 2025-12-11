@@ -1,10 +1,8 @@
 use bevy::prelude::*;
 
-
 #[derive(Component, Reflect)]
 #[relationship(relationship_target = CameraFollow)]
 pub struct CameraOf(pub Entity);
-
 
 #[derive(Component, Reflect)]
 #[relationship_target(relationship = CameraOf)]
@@ -46,7 +44,9 @@ pub fn follow_target(
     mut follower: Query<(&mut Transform, &CameraOf), Without<CameraFollow>>,
 ) {
     for (mut transform, camera_of) in follower.iter_mut() {
-        let Ok((xf, axes)) = target.get(camera_of.0) else { continue; };
+        let Ok((xf, axes)) = target.get(camera_of.0) else {
+            continue;
+        };
         if axes.has(FollowAxes::HORIZONTAL) {
             transform.translation.x = xf.translation.x;
         }
@@ -55,4 +55,3 @@ pub fn follow_target(
         }
     }
 }
-

@@ -26,7 +26,7 @@ pub fn build_ui(mut commands: Commands, mut s: SceneBuilder) {
         .spawn_scene(("ui/main.cob", "main_scene"), &mut s, |sc| {
             sc.get("cell::text").update_text("Runtime!");
 
-            for i in (0..=10).into_iter() {
+            for i in 0..=10 {
                 sc.spawn_scene(("ui/main.cob", "number_text"), |sc| {
                     sc.edit("cell::text", |sc| {
                         sc.update_text(i.to_string());

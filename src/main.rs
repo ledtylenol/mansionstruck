@@ -14,12 +14,10 @@ mod screens;
 mod ui;
 mod walls;
 
-mod char_controller;
 mod camera;
+mod char_controller;
 
-use bevy::ecs::schedule::ScheduleLabel;
 use bevy::{asset::AssetMetaCheck, prelude::*};
-use bevy_cobweb::prelude::*;
 use bevy_cobweb_ui::prelude::*;
 use seldom_state::prelude::*;
 
@@ -50,7 +48,7 @@ impl Plugin for AppPlugin {
                         fit_canvas_to_parent: true,
                         ..default()
                     }
-                        .into(),
+                    .into(),
                     ..default()
                 })
                 .set(ImagePlugin::default_nearest()),
@@ -70,7 +68,7 @@ impl Plugin for AppPlugin {
             CobwebUiPlugin,
             StateMachinePlugin::default(),
         ))
-            .load("ui/main.cob");
+        .load("ui/main.cob");
 
         // Order new `AppSystems` variants by adding them here:
         app.configure_sets(
