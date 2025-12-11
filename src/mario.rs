@@ -1,4 +1,4 @@
-use crate::camera::{CameraOf, FollowAxes};
+use crate::camera::{ClampFlags, ClampPosition, FollowAxes, FollowerOf};
 use crate::input::{Crouch, InputSettings, Jump, Move, Run};
 use crate::physics::{ColliderShape, Grounded, KinematicController, TimeSince};
 use avian2d::prelude::*;
@@ -431,7 +431,13 @@ fn handle_mario_startup(
             ..OrthographicProjection::default_2d()
         }),
         Transform::from_xyz(1280.0 / 4.0, 238.0, 0.0),
-        CameraOf(e.entity),
+        FollowerOf(e.entity),
+        ClampFlags(ClampFlags::MIN_X),
+        //TODO this really should use Option<T> for clamping
+        ClampPosition {
+            min: vec2(f32::NEG_INFINITY, f32::NEG_INFINITY),
+            max: vec2(10000000.0, 10000000.0),
+        },
         TransformInterpolation,
     ));
     commands
