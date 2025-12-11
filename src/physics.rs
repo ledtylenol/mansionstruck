@@ -97,12 +97,12 @@ fn perform_move_and_slide(
     mut char: Query<(Entity, &Collider, &mut KinematicController, &mut Transform)>,
     move_and_slide: MoveAndSlide,
     time: Res<Time>,
+    #[cfg(feature = "dev")]
     mut gizmos: Gizmos,
 ) {
     for (entity, collider, mut controller, mut transform) in char.iter_mut() {
         let velocity = controller.velocity;
         let filter = SpatialQueryFilter::from_excluded_entities([entity]);
-        let mut collisions = HashSet::new();
         let out = move_and_slide.move_and_slide(
             collider,
             transform.translation.xy().adjust_precision(),
@@ -115,8 +115,8 @@ fn perform_move_and_slide(
             time.delta(),
             &MoveAndSlideConfig::default(),
             &filter,
+            #[cfg(feature = "dev")]
             |hit| {
-                collisions.insert(hit.entity);
                 if hit.intersects() {
                     gizmos.circle_2d(
                         Isometry2d::from_translation(transform.translation.xy()),
@@ -135,6 +135,8 @@ fn perform_move_and_slide(
                 }
                 true
             },
+            #[cfg(not(feature = "dev"))]
+            |hit| { true },
         );
         transform.translation = out.position.f32().extend(0.0);
         controller.velocity = out.projected_velocity;
