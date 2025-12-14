@@ -1,6 +1,7 @@
-use crate::camera::{ClampFlags, ClampPosition, FollowAxes, FollowerOf};
+use crate::camera::{CameraReset, ClampFlags, ClampPosition, FollowAxes, FollowerOf};
 use crate::input::{Crouch, InputSettings, Jump, Move, Run};
 use crate::physics::{ColliderShape, Grounded, KinematicController, TimeSince};
+use crate::PausableSystems;
 use avian2d::prelude::*;
 use bevy::prelude::*;
 use bevy_ecs_ldtk::prelude::*;
@@ -270,10 +271,13 @@ pub(crate) fn plugin(app: &mut App) {
         .add_systems(Startup, setup)
         .add_systems(
             Update,
-            (move_mario, jump, update_sprite, update_mario_gravity).chain(),
+            (move_mario, jump, update_sprite, update_mario_gravity)
+                .chain()
+                .in_set(PausableSystems),
         )
         //.add_observer(friction)
-        .add_observer(handle_mario_startup);
+        .add_observer(handle_mario_startup)
+        .add_observer(respawn_level);
 }
 
 fn update_sprite(
@@ -359,6 +363,15 @@ fn update_mario_gravity(
         }
     }
 }
+fn respawn_level(
+    _trigger: On<Start<crate::input::Respawn>>,
+    mut commands: Commands,
+    level: Single<Entity, With<LevelIid>>,
+) {
+    commands.entity(level.into_inner()).insert(Respawn);
+    info!("respawning level");
+    commands.trigger(CameraReset);
+}
 fn move_mario(
     mario: Single<(&mut KinematicController, &MoveStats, Option<&Grounded>), With<Mario>>,
     inputs: Single<&ActionValue, With<Action<Move>>>,
@@ -417,10 +430,18 @@ fn handle_mario_startup(
             Bidirectional::new(input_settings.right[0], input_settings.left[0]),
             Bidirectional::new(input_settings.right[1], input_settings.left[1]),
             Bidirectional::new(input_settings.right[2], input_settings.left[2]),
-        ))
-        )
+            ))
+        ),
+        (
+            Action::<crate::input::Respawn>::new(),
+            Bindings::spawn(SpawnIter(input_settings.respawn.into_iter()))
+        ),
+
     ]
     ));
+    commands
+        .entity(e.entity)
+        .insert(FollowAxes::new(FollowAxes::HORIZONTAL));
     commands.spawn((
         Camera2d,
         Projection::Orthographic(OrthographicProjection {
@@ -430,8 +451,10 @@ fn handle_mario_startup(
             },
             ..OrthographicProjection::default_2d()
         }),
+        //TODO spawn at mario location instead?
         Transform::from_xyz(1280.0 / 4.0, 238.0, 0.0),
         FollowerOf(e.entity),
+        //per level camera
         ClampFlags(ClampFlags::MIN_X),
         //TODO this really should use Option<T> for clamping
         ClampPosition {
@@ -440,7 +463,4 @@ fn handle_mario_startup(
         },
         TransformInterpolation,
     ));
-    commands
-        .entity(e.entity)
-        .insert(FollowAxes::new(FollowAxes::HORIZONTAL));
 }

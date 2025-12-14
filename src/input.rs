@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::error::Error;
 use std::fs;
 
-#[derive(Resource, Reflect, Clone, Deserialize, Serialize)]
+#[derive(Resource, Debug, Reflect, Clone, Deserialize, Serialize)]
 #[serde(default)]
 pub struct InputSettings {
     pub left: [Binding; 3],
@@ -14,6 +14,7 @@ pub struct InputSettings {
     pub jump: [Binding; 3],
     pub run: [Binding; 3],
     pub crouch: [Binding; 3],
+    pub respawn: [Binding; 3],
 }
 
 impl InputSettings {
@@ -58,6 +59,7 @@ impl Default for InputSettings {
                 KeyCode::ArrowDown.into(),
                 Binding::None,
             ],
+            respawn: [KeyCode::KeyR.into(), Binding::None, Binding::None],
         }
     }
 }
@@ -74,6 +76,11 @@ pub struct Run;
 #[derive(InputAction)]
 #[action_output(bool)]
 pub struct Crouch;
+
+#[derive(InputAction)]
+#[action_output(bool)]
+pub struct Respawn;
+
 pub(crate) fn plugin(app: &mut App) {
     let input = InputSettings::default();
     app.add_plugins(EnhancedInputPlugin)
@@ -81,7 +88,7 @@ pub(crate) fn plugin(app: &mut App) {
     let res = InputSettings::read("assets/input.ron");
     match res {
         Ok(settings) => {
-            info!("input found! inserting");
+            info!("input found! inserting {settings:?}");
             app.insert_resource(settings);
         }
         Err(e) => match e.downcast_ref::<std::io::Error>() {
