@@ -8,6 +8,7 @@ use bevy_ecs_ldtk::prelude::*;
 use bevy_enhanced_input::prelude::*;
 use serde::Deserialize;
 use std::fs::read_to_string;
+use std::time::Duration;
 
 #[derive(Component, Reflect, Deserialize)]
 pub struct Mario {
@@ -321,6 +322,7 @@ fn jump(
         &mut TimeSince<Grounded>,
     )>,
     time: Res<Time>,
+    mut commands: Commands,
 ) {
     let (mut controller, mut mario, mut stats, mut time_since) = mario.into_inner();
     if time_since.time == 0.0 && mario.jumped {
@@ -348,6 +350,7 @@ fn jump(
     time_since.time = 0.1;
     //if we dont have an atlas something went very very wrong
     mario.jumped = true;
+    commands.trigger(crate::time::TimerEvent::Start(Duration::from_secs_f32(0.1)));
 }
 
 fn update_mario_gravity(
