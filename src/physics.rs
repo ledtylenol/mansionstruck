@@ -137,8 +137,8 @@ fn perform_move_and_slide(
                         hit.point.f32(),
                         (hit.point
                             + hit.normal.adjust_precision() * hit.collision_distance
-                                / time.delta_secs().adjust_precision())
-                        .f32(),
+                            / time.delta_secs().adjust_precision())
+                            .f32(),
                         tailwind::EMERALD_400,
                     );
                 }
@@ -147,7 +147,7 @@ fn perform_move_and_slide(
             #[cfg(not(feature = "dev"))]
             |hit| true,
         );
-        transform.translation = out.position.f32().extend(0.0);
+        transform.translation = out.position.f32().extend(transform.translation.z);
         controller.velocity = out.projected_velocity;
         //info!("{} is colliding with entities: {:?}", entity, collisions);
     }

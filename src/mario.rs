@@ -10,6 +10,20 @@ use serde::Deserialize;
 use std::fs::read_to_string;
 use std::time::Duration;
 
+
+#[derive(Component, Reflect)]
+pub struct Ghost {
+    time: f32,
+    start: f32,
+}
+#[derive(Component, Reflect, Deserialize)]
+pub struct GhostConfig(pub f32);
+
+impl Default for GhostConfig {
+    fn default() -> Self {
+        GhostConfig(0.1)
+    }
+}
 #[derive(Component, Reflect, Deserialize)]
 pub struct Mario {
     pub time_since_space: f32,
@@ -146,6 +160,7 @@ pub struct MarioBundle {
     pub jump_stats: JumpStats,
     #[serde(default)]
     pub time_since: TimeSince<Grounded>,
+    pub ghost_config: GhostConfig,
 }
 impl From<&EntityInstance> for MarioBundle {
     fn from(entity_instance: &EntityInstance) -> Self {
@@ -272,7 +287,7 @@ pub(crate) fn plugin(app: &mut App) {
         .add_systems(Startup, setup)
         .add_systems(
             Update,
-            (move_mario, jump, update_sprite, update_mario_gravity)
+            (move_mario, jump, update_sprite, update_mario_gravity, spawn_ghosts, manage_ghosts)
                 .chain()
                 .in_set(PausableSystems),
         )
@@ -351,6 +366,42 @@ fn jump(
     //if we dont have an atlas something went very very wrong
     mario.jumped = true;
     commands.trigger(crate::time::TimerEvent::Start(Duration::from_secs_f32(0.1)));
+}
+
+fn spawn_ghosts(
+    mario_query: Single<(&Transform, &Sprite, &GhostConfig, &KinematicController), (With<Mario>, Without<Grounded>)>,
+    mut commands: Commands,
+    time: Res<Time>,
+    mut timer: Local<f32>,
+) {
+    let (xf, sprite, &GhostConfig(val), KinematicController { velocity: vel }) = mario_query.into_inner();
+    let (xf, sprite) = (xf.clone(), sprite.clone());
+    if *timer > val && vel.length() > 100.0 {
+        commands.spawn(
+            (
+                sprite,
+                xf,
+                Ghost { time: 1.0, start: rand::random_range(-10.0..10.0) },
+                Name::new("Ghost")
+            )
+        );
+        *timer = 0.0;
+    }
+    *timer += time.delta_secs();
+}
+
+fn manage_ghosts(
+    mut ghost_q: Query<(Entity, &mut Ghost, &mut Sprite)>,
+    time: Res<Time>,
+    mut commands: Commands,
+) {
+    for (e, mut ghost, mut sprite) in ghost_q.iter_mut() {
+        ghost.time -= time.delta_secs();
+        sprite.color = Color::hsva(ops::sin(ghost.time + ghost.start) * 180.0 + 180.0, ops::cos(ghost.time + ghost.start) * 0.5 + 0.5, 1.0, ghost.time);
+        if ghost.time <= 0.0 {
+            commands.entity(e).despawn();
+        }
+    }
 }
 
 fn update_mario_gravity(
