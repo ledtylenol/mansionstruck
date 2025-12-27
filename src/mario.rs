@@ -1,15 +1,17 @@
 use crate::camera::{CameraReset, ClampFlags, ClampPosition, FollowAxes, FollowerOf};
 use crate::input::{Crouch, InputSettings, Jump, Move, Run};
-use crate::physics::{ColliderShape, Grounded, KinematicController, TimeSince};
-use crate::PausableSystems;
+use crate::physics::{ColliderShape, Grounded, KinematicController};
+use crate::time::{PausableSystems, TimeSince};
 use avian2d::prelude::*;
+use bevy::asset::io::Writer;
 use bevy::prelude::*;
 use bevy_ecs_ldtk::prelude::*;
 use bevy_enhanced_input::prelude::*;
+use ron::ser::PrettyConfig;
 use serde::Deserialize;
-use std::fs::read_to_string;
+use std::fs::{read_to_string, File, OpenOptions};
+use std::io::Write;
 use std::time::Duration;
-
 
 #[derive(Component, Reflect)]
 pub struct Ghost {
@@ -293,6 +295,7 @@ pub(crate) fn plugin(app: &mut App) {
         )
         //.add_observer(friction)
         .add_observer(handle_mario_startup)
+        .add_observer(serialize_mario)
         .add_observer(respawn_level);
 }
 
@@ -397,7 +400,7 @@ fn manage_ghosts(
 ) {
     for (e, mut ghost, mut sprite) in ghost_q.iter_mut() {
         ghost.time -= time.delta_secs();
-        sprite.color = Color::hsva(ops::sin(ghost.time + ghost.start) * 180.0 + 180.0, ops::cos(ghost.time + ghost.start) * 0.5 + 0.5, 1.0, ghost.time);
+        sprite.color = Color::hsva(ops::sin(ghost.time + ghost.start) * 90.0 + 180.0, 1.0, 1.0, ghost.time);
         if ghost.time <= 0.0 {
             commands.entity(e).despawn();
         }
@@ -417,10 +420,45 @@ fn update_mario_gravity(
         }
     }
 }
+
+fn serialize_mario(
+    _trigger: On<Start<crate::input::Respawn>>,
+    mario: Query<Entity, With<Mario>>,
+) {
+    info!("starting serialization");
+    let mario = mario.single_inner();
+    match mario {
+        Ok(mario) => {
+            let res = ron::ser::to_string_pretty(&mario, PrettyConfig::default());
+            info!("stringed");
+            match res {
+                Ok(res) => {
+                    let mut file = OpenOptions::new();
+                    file.truncate(true);
+                    file.write(true);
+                    file.create(true);
+
+
+                    match file.open("assets/entities/mario/test.ron") {
+                        Ok(mut file) => {
+                            file.write_all(res.as_bytes()).expect("nush boss");
+                            info!("written {res}");
+                        }
+                        Err(e) => {
+                            error!("{e}");
+                        }
+                    }
+                }
+                Err(e) => error!("{e}")
+            }
+        }
+        Err(e) => error!("{e}")
+    }
+}
 fn respawn_level(
     _trigger: On<Start<crate::input::Respawn>>,
     mut commands: Commands,
-    level: Single<Entity, With<LevelIid>>,
+    level: Single<Entity, (With<LevelIid>, Without<Mario>)>,
 ) {
     commands.entity(level.into_inner()).insert(Respawn);
     info!("respawning level");

@@ -21,6 +21,7 @@ mod time;
 use bevy::{asset::AssetMetaCheck, prelude::*};
 use bevy_cobweb_ui::prelude::*;
 use seldom_state::prelude::*;
+use crate::time::{AppSystems, PausableSystems, Pause};
 
 #[derive(Copy, Clone, Component)]
 struct RotateComp;
@@ -88,24 +89,3 @@ impl Plugin for AppPlugin {
         app.configure_sets(Update, PausableSystems.run_if(in_state(Pause(false))));
     }
 }
-
-/// High-level groupings of systems for the app in the `Update` schedule.
-/// When adding a new variant, make sure to order it in the `configure_sets`
-/// call above.
-#[derive(SystemSet, Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
-enum AppSystems {
-    /// Tick timers.
-    TickTimers,
-    /// Record player input.
-    RecordInput,
-    /// Do everything else (consider splitting this into further variants).
-    Update,
-}
-
-/// Whether or not the game is paused.
-#[derive(States, Copy, Clone, Eq, PartialEq, Hash, Debug, Default)]
-struct Pause(pub bool);
-
-/// A system set for systems that shouldn't run while the game is paused.
-#[derive(SystemSet, Copy, Clone, Eq, PartialEq, Hash, Debug)]
-struct PausableSystems;

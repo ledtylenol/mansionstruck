@@ -4,6 +4,7 @@ use avian2d::math::{AdjustPrecision, AsF32};
 use avian2d::prelude::*;
 use bevy::color::palettes::tailwind;
 use bevy::prelude::*;
+use bevy_ecs_tilemap::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::marker::PhantomData;
 
@@ -20,27 +21,17 @@ pub enum ColliderShape {
 pub struct KinematicController {
     pub velocity: Vec2,
 }
-#[derive(Component, Copy, Clone, Debug, Reflect, Default, Deserialize)]
-#[reflect(Component)]
-pub struct TimeSince<T> {
-    pub time: f32,
-    //for generics
-    #[reflect(ignore)]
-    _phantom: PhantomData<T>,
-}
 pub(crate) fn plugin(app: &mut App) {
     app.add_plugins(PhysicsPlugins::default().with_length_unit(10.0))
         .add_systems(
             FixedUpdate,
             (
                 check_grounded,
-                update_time_since,
                 apply_gravity,
                 perform_move_and_slide,
             )
                 .chain(),
-        )
-        .register_type::<TimeSince<Grounded>>();
+        );
 }
 
 pub fn apply_gravity(
@@ -91,24 +82,22 @@ fn check_grounded(mut char: Query<(Entity, &ShapeHits)>, mut commands: Commands)
         }
     }
 }
-fn update_time_since(
-    mut query: Query<(&mut TimeSince<Grounded>, Option<&Grounded>)>,
-    time: Res<Time>,
-) {
-    for (mut time_since, grounded) in query.iter_mut() {
-        if grounded.is_some() {
-            time_since.time = 0.0;
-        } else {
-            time_since.time += time.delta_secs();
-        }
-    }
-}
 fn perform_move_and_slide(
     mut char: Query<(Entity, &Collider, &mut KinematicController, &mut Transform)>,
+    mut tile_q: Query<&mut TileColor>,
+    tilemap_q: Single<(
+        &TilemapSize,
+        &TilemapGridSize,
+        &TilemapTileSize,
+        &TilemapType,
+        &TileStorage,
+        &TilemapAnchor,
+    )>,
     move_and_slide: MoveAndSlide,
     time: Res<Time>,
     #[cfg(feature = "dev")] mut gizmos: Gizmos,
 ) {
+    let (size, grid_size, tile_size, map_type, storage, anchor) = tilemap_q.into_inner();
     for (entity, collider, mut controller, mut transform) in char.iter_mut() {
         let velocity = controller.velocity;
         let filter = SpatialQueryFilter::from_excluded_entities([entity]);
@@ -126,6 +115,13 @@ fn perform_move_and_slide(
             &filter,
             #[cfg(feature = "dev")]
             |hit| {
+                if let Some(pos) = TilePos::from_world_pos(&(transform.translation.xy() + controller.velocity.normalize() * 16.0 + vec2(-8.0, -8.0)), size, grid_size, tile_size, map_type, anchor)
+                    && let Some(entity) = storage.get(&pos) {
+                    info!("hit the tile {entity}", );
+                    if let Ok(mut color) = tile_q.get_mut(entity) {
+                        color.0 = Color::BLACK;
+                    }
+                }
                 if hit.intersects() {
                     gizmos.circle_2d(
                         Isometry2d::from_translation(transform.translation.xy()),
@@ -142,6 +138,7 @@ fn perform_move_and_slide(
                         tailwind::EMERALD_400,
                     );
                 }
+                info!("{}", hit.entity);
                 true
             },
             #[cfg(not(feature = "dev"))]

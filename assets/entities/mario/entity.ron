@@ -8,5 +8,5 @@
            move_speed: 75.0,
            run_speed: 135.0,
     ),
-    ghost_config: (0.1)
+    ghost_config: (0.0001)
 )
