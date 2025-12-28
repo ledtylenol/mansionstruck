@@ -26,8 +26,8 @@ RUN git clone https://github.com/ledtylenol/mansionstruck.git .
 RUN cargo install cargo-binstall
 RUN cargo binstall --version 0.1.0-alpha.2 --locked --no-confirm --force --git='https://github.com/TheBevyFlock/bevy_cli' bevy_cli
 RUN bevy build -r --target x86_64-pc-windows-gnu
-RUN cargo build --release --target x86_64-pc-windows-gnu
 
 # ---- Copy exe to /game ----
 CMD mkdir -p /game && \
-    cp target/x86_64-pc-windows-gnu/release/*.exe /game
+    cp target/x86_64-pc-windows-gnu/release/*.exe game && \
+    cp ./game/* /game -rf
