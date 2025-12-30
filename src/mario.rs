@@ -295,7 +295,6 @@ pub(crate) fn plugin(app: &mut App) {
         )
         //.add_observer(friction)
         .add_observer(handle_mario_startup)
-        .add_observer(serialize_mario)
         .add_observer(respawn_level);
 }
 
@@ -421,40 +420,6 @@ fn update_mario_gravity(
     }
 }
 
-fn serialize_mario(
-    _trigger: On<Start<crate::input::Respawn>>,
-    mario: Query<Entity, With<Mario>>,
-) {
-    info!("starting serialization");
-    let mario = mario.single_inner();
-    match mario {
-        Ok(mario) => {
-            let res = ron::ser::to_string_pretty(&mario, PrettyConfig::default());
-            info!("stringed");
-            match res {
-                Ok(res) => {
-                    let mut file = OpenOptions::new();
-                    file.truncate(true);
-                    file.write(true);
-                    file.create(true);
-
-
-                    match file.open("assets/entities/mario/test.ron") {
-                        Ok(mut file) => {
-                            file.write_all(res.as_bytes()).expect("nush boss");
-                            info!("written {res}");
-                        }
-                        Err(e) => {
-                            error!("{e}");
-                        }
-                    }
-                }
-                Err(e) => error!("{e}")
-            }
-        }
-        Err(e) => error!("{e}")
-    }
-}
 fn respawn_level(
     _trigger: On<Start<crate::input::Respawn>>,
     mut commands: Commands,
@@ -518,11 +483,14 @@ fn handle_mario_startup(
         ),
         (
             Action::<Move>::new(),
+            DeadZone::default(),
             Bindings::spawn((
             Bidirectional::new(input_settings.right[0], input_settings.left[0]),
             Bidirectional::new(input_settings.right[1], input_settings.left[1]),
             Bidirectional::new(input_settings.right[2], input_settings.left[2]),
-            ))
+            SpawnIter(input_settings.mv.into_iter())
+            )),
+
         ),
         (
             Action::<crate::input::Respawn>::new(),

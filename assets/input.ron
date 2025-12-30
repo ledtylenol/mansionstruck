@@ -5,22 +5,23 @@
     ), Keyboard(
         key: ArrowLeft,
         mod_keys: (0),
-    ), r#None),
+    ), GamepadButton(DPadLeft)),
     right: (Keyboard(
         key: KeyD,
         mod_keys: (0),
     ), Keyboard(
         key: ArrowRight,
         mod_keys: (0),
-    ), r#None),
+    ), GamepadButton(DPadRight)),
+    mv: (GamepadAxis(LeftStickX), r#None, r#None),
     jump: (Keyboard(
         key: Space,
         mod_keys: (0),
-    ), r#None, r#None),
+    ), GamepadButton(South), r#None),
     run: (Keyboard(
         key: ShiftLeft,
         mod_keys: (0),
-    ), r#None, r#None),
+    ), GamepadButton(LeftTrigger), r#None),
     crouch: (Keyboard(
         key: KeyS,
         mod_keys: (0),

@@ -11,6 +11,7 @@ use std::fs;
 pub struct InputSettings {
     pub left: [Binding; 3],
     pub right: [Binding; 3],
+    pub mv: [Binding; 3],
     pub jump: [Binding; 3],
     pub run: [Binding; 3],
     pub crouch: [Binding; 3],
@@ -42,18 +43,19 @@ impl InputSettings {
 impl Default for InputSettings {
     fn default() -> Self {
         Self {
+            mv: [Axial::left_stick().x, Binding::None, Binding::None],
             left: [
                 KeyCode::KeyA.into(),
                 KeyCode::ArrowLeft.into(),
-                Binding::None,
+                GamepadButton::DPadLeft.into(),
             ],
             right: [
                 KeyCode::KeyD.into(),
                 KeyCode::ArrowRight.into(),
-                Binding::None,
+                GamepadButton::DPadRight.into(),
             ],
-            jump: [KeyCode::Space.into(), Binding::None, Binding::None],
-            run: [KeyCode::ShiftLeft.into(), Binding::None, Binding::None],
+            jump: [KeyCode::Space.into(), GamepadButton::South.into(), Binding::None],
+            run: [KeyCode::ShiftLeft.into(), GamepadButton::LeftTrigger.into(), Binding::None],
             crouch: [
                 KeyCode::KeyS.into(),
                 KeyCode::ArrowDown.into(),
