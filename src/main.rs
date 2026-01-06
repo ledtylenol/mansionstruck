@@ -18,10 +18,10 @@ mod camera;
 mod char_controller;
 mod time;
 
+use crate::time::{AppSystems, PausableSystems, Pause};
 use bevy::{asset::AssetMetaCheck, prelude::*};
 use bevy_cobweb_ui::prelude::*;
 use seldom_state::prelude::*;
-use crate::time::{AppSystems, PausableSystems, Pause};
 
 #[derive(Copy, Clone, Component)]
 struct RotateComp;
@@ -50,7 +50,7 @@ impl Plugin for AppPlugin {
                         fit_canvas_to_parent: true,
                         ..default()
                     }
-                        .into(),
+                    .into(),
                     ..default()
                 })
                 .set(ImagePlugin::default_nearest()),
@@ -71,7 +71,7 @@ impl Plugin for AppPlugin {
             StateMachinePlugin::default(),
             time::plugin,
         ))
-            .load("ui/main.cob");
+        .load("ui/main.cob");
 
         // Order new `AppSystems` variants by adding them here:
         app.configure_sets(

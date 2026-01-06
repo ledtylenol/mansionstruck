@@ -1,6 +1,7 @@
 //! Development tools for the game. This plugin is only enabled in dev builds.
 
 use crate::screens::Screen;
+use avian2d::prelude::*;
 use bevy::input::common_conditions::input_toggle_active;
 use bevy::{dev_tools::states::log_transitions, prelude::*};
 use bevy_inspector_egui::bevy_egui::{EguiContext, EguiPlugin, PrimaryEguiContext};
@@ -15,7 +16,7 @@ pub(super) fn plugin(app: &mut App) {
         EguiPlugin::default(),
         bevy_inspector_egui::quick::WorldInspectorPlugin::new()
             .run_if(input_toggle_active(false, TOGGLE_KEY)),
-        //PhysicsDebugPlugin::default(),
+        PhysicsDebugPlugin::default(),
     ));
 }
 

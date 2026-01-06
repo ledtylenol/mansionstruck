@@ -74,18 +74,14 @@ pub enum PauseEvent {
 }
 pub(crate) fn plugin(app: &mut App) {
     app.insert_resource(StopTimer {
-        timer: Timer::from_seconds(
-            0.0,
-            TimerMode::Once,
-        ),
+        timer: Timer::from_seconds(0.0, TimerMode::Once),
         paused: false,
     })
-        .add_systems(Update, tick_pause_timer)
-        .add_systems(FixedUpdate, (update_time_since::<Grounded>))
-        .add_observer(timer_events)
-        .register_type::<StopTimer>()
-        .register_type::<TimeSince<Grounded>>()
-        .add_observer(handle_pause_event);
+    .add_systems(Update, tick_pause_timer)
+    .add_observer(timer_events)
+    .register_type::<StopTimer>()
+    .register_type::<TimeSince<Grounded>>()
+    .add_observer(handle_pause_event);
 }
 
 fn handle_pause_event(obs: On<PauseEvent>, mut virtual_time: ResMut<Time<Virtual>>) {
@@ -108,7 +104,9 @@ fn handle_pause_event(obs: On<PauseEvent>, mut virtual_time: ResMut<Time<Virtual
 }
 fn tick_pause_timer(mut commands: Commands, time: Res<Time<Real>>, mut timer: ResMut<StopTimer>) {
     //don't tick if it's paused
-    if timer.paused { return; }
+    if timer.paused {
+        return;
+    }
     timer.tick(time.delta());
     if timer.just_finished() {
         commands.trigger(PauseEvent::Disable);
@@ -140,7 +138,7 @@ fn timer_events(event: On<TimerEvent>, mut commands: Commands, mut timer: ResMut
     }
 }
 //generalize yes yes
-fn update_time_since<T: Component>(
+pub fn update_time_since<T: Component>(
     mut query: Query<(&mut TimeSince<T>, Option<&T>)>,
     time: Res<Time>,
 ) {

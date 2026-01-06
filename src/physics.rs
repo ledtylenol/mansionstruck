@@ -3,6 +3,7 @@ use crate::mario::JumpStats;
 use avian2d::math::{AdjustPrecision, AsF32};
 use avian2d::prelude::*;
 use bevy::color::palettes::tailwind;
+use bevy::ecs::schedule::LogLevel::Ignore;
 use bevy::prelude::*;
 use bevy_ecs_tilemap::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -16,6 +17,8 @@ pub enum ColliderShape {
     Cuboid(f32, f32),
     Capsule(f32, f32),
 }
+#[derive(Clone, Copy, Component)]
+pub struct IgnoreGrounded;
 
 #[derive(Component, Copy, Clone, Debug, Reflect, Default)]
 pub struct KinematicController {
@@ -25,12 +28,7 @@ pub(crate) fn plugin(app: &mut App) {
     app.add_plugins(PhysicsPlugins::default().with_length_unit(10.0))
         .add_systems(
             FixedUpdate,
-            (
-                check_grounded,
-                apply_gravity,
-                perform_move_and_slide,
-            )
-                .chain(),
+            (check_grounded, apply_gravity, perform_move_and_slide).chain(),
         );
 }
 
@@ -71,13 +69,23 @@ impl Default for ColliderShape {
         ColliderShape::Cuboid(20.0, 20.0)
     }
 }
-fn check_grounded(mut char: Query<(Entity, &ShapeHits)>, mut commands: Commands) {
-    for (entity, hits) in char.iter_mut() {
+fn check_grounded(
+    mut char: Query<(Entity, &ShapeHits, Option<&IgnoreGrounded>)>,
+    mut commands: Commands,
+) {
+    for (entity, hits, gr) in char.iter_mut() {
         let is_grounded = hits.iter().count() > 0;
+        if gr.is_some() {
+            commands.entity(entity).remove::<IgnoreGrounded>();
+            continue;
+        }
 
         if is_grounded {
+            info!("entity is grounded");
             commands.entity(entity).insert(Grounded);
         } else {
+            info!("entity is not grounded");
+
             commands.entity(entity).try_remove::<Grounded>();
         }
     }
@@ -115,9 +123,18 @@ fn perform_move_and_slide(
             &filter,
             #[cfg(feature = "dev")]
             |hit| {
-                if let Some(pos) = TilePos::from_world_pos(&(transform.translation.xy() + controller.velocity.normalize() * 16.0 + vec2(-8.0, -8.0)), size, grid_size, tile_size, map_type, anchor)
-                    && let Some(entity) = storage.get(&pos) {
-                    info!("hit the tile {entity}", );
+                if let Some(pos) = TilePos::from_world_pos(
+                    &(transform.translation.xy()
+                        + controller.velocity.normalize() * 16.0
+                        + vec2(-8.0, -8.0)),
+                    size,
+                    grid_size,
+                    tile_size,
+                    map_type,
+                    anchor,
+                ) && let Some(entity) = storage.get(&pos)
+                {
+                    info!("hit the tile {entity}",);
                     if let Ok(mut color) = tile_q.get_mut(entity) {
                         color.0 = Color::BLACK;
                     }

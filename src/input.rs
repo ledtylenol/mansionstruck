@@ -54,8 +54,16 @@ impl Default for InputSettings {
                 KeyCode::ArrowRight.into(),
                 GamepadButton::DPadRight.into(),
             ],
-            jump: [KeyCode::Space.into(), GamepadButton::South.into(), Binding::None],
-            run: [KeyCode::ShiftLeft.into(), GamepadButton::LeftTrigger.into(), Binding::None],
+            jump: [
+                KeyCode::Space.into(),
+                GamepadButton::South.into(),
+                Binding::None,
+            ],
+            run: [
+                KeyCode::ShiftLeft.into(),
+                GamepadButton::LeftTrigger.into(),
+                Binding::None,
+            ],
             crouch: [
                 KeyCode::KeyS.into(),
                 KeyCode::ArrowDown.into(),

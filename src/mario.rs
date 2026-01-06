@@ -1,7 +1,7 @@
 use crate::camera::{CameraReset, ClampFlags, ClampPosition, FollowAxes, FollowerOf};
 use crate::input::{Crouch, InputSettings, Jump, Move, Run};
-use crate::physics::{ColliderShape, Grounded, KinematicController};
-use crate::time::{PausableSystems, TimeSince};
+use crate::physics::{ColliderShape, Grounded, IgnoreGrounded, KinematicController};
+use crate::time::{PausableSystems, TimeSince, update_time_since};
 use avian2d::prelude::*;
 use bevy::asset::io::Writer;
 use bevy::prelude::*;
@@ -9,7 +9,7 @@ use bevy_ecs_ldtk::prelude::*;
 use bevy_enhanced_input::prelude::*;
 use ron::ser::PrettyConfig;
 use serde::Deserialize;
-use std::fs::{read_to_string, File, OpenOptions};
+use std::fs::{File, OpenOptions, read_to_string};
 use std::io::Write;
 use std::time::Duration;
 
@@ -289,12 +289,20 @@ pub(crate) fn plugin(app: &mut App) {
         .add_systems(Startup, setup)
         .add_systems(
             Update,
-            (move_mario, jump, update_sprite, update_mario_gravity, spawn_ghosts, manage_ghosts)
+            (
+                move_mario,
+                update_sprite,
+                update_mario_gravity,
+                spawn_ghosts,
+                manage_ghosts,
+            )
                 .chain()
                 .in_set(PausableSystems),
         )
+        .add_systems(PostUpdate, (jump, update_time_since::<Grounded>).chain())
         //.add_observer(friction)
         .add_observer(handle_mario_startup)
+        .add_observer(reset_camera_limits)
         .add_observer(respawn_level);
 }
 
@@ -333,6 +341,7 @@ fn update_sprite(
 fn jump(
     jump: Single<(&ActionEvents, &ActionTime), With<Action<Jump>>>,
     mario: Single<(
+        Entity,
         &mut KinematicController,
         &mut Mario,
         &mut JumpStats,
@@ -341,7 +350,7 @@ fn jump(
     time: Res<Time>,
     mut commands: Commands,
 ) {
-    let (mut controller, mut mario, mut stats, mut time_since) = mario.into_inner();
+    let (e, mut controller, mut mario, mut stats, mut time_since) = mario.into_inner();
     if time_since.time == 0.0 && mario.jumped {
         mario.jumped = false;
         return;
@@ -368,40 +377,79 @@ fn jump(
     //if we dont have an atlas something went very very wrong
     mario.jumped = true;
     commands.trigger(crate::time::TimerEvent::Start(Duration::from_secs_f32(0.1)));
+    commands.entity(e).remove::<Grounded>();
+    commands.entity(e).insert(IgnoreGrounded);
+    info!("jumped");
 }
 
+fn reset_camera_limits(
+    _trigger: On<CameraReset>,
+    mario: Single<&Transform, With<Mario>>,
+    mut clamp_pos: Single<&mut ClampPosition>,
+) {
+    info!("Resetting camera limits");
+    clamp_pos.min = mario.translation.xy();
+}
 fn spawn_ghosts(
-    mario_query: Single<(&Transform, &Sprite, &GhostConfig, &KinematicController), (With<Mario>, Without<Grounded>)>,
+    mario_query: Single<
+        (&Transform, &Sprite, &GhostConfig, &KinematicController),
+        (With<Mario>, Without<Grounded>),
+    >,
     mut commands: Commands,
     time: Res<Time>,
     mut timer: Local<f32>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<ColorMaterial>>,
 ) {
-    let (xf, sprite, &GhostConfig(val), KinematicController { velocity: vel }) = mario_query.into_inner();
-    let (xf, sprite) = (xf.clone(), sprite.clone());
+    let (xf, sprite, &GhostConfig(val), KinematicController { velocity: vel }) =
+        mario_query.into_inner();
+    let (xf, _sprite) = (xf.clone(), sprite.clone());
     if *timer > val && vel.length() > 100.0 {
-        commands.spawn(
-            (
-                sprite,
-                xf,
-                Ghost { time: 1.0, start: rand::random_range(-10.0..10.0) },
-                Name::new("Ghost")
-            )
-        );
+        let shape = meshes.add(Annulus::new(30.0, 33.0));
+        let color = Color::WHITE;
+        commands.spawn((
+            Mesh2d(shape),
+            MeshMaterial2d(materials.add(color)),
+            xf,
+            Ghost {
+                time: 1.0,
+                start: rand::random_range(-10.0..10.0),
+            },
+            Name::new("Ghost"),
+        ));
         *timer = 0.0;
     }
     *timer += time.delta_secs();
 }
 
 fn manage_ghosts(
-    mut ghost_q: Query<(Entity, &mut Ghost, &mut Sprite)>,
+    mut ghost_q: Query<(
+        Entity,
+        &mut Ghost,
+        &mut Mesh2d,
+        &MeshMaterial2d<ColorMaterial>,
+    )>,
     time: Res<Time>,
     mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<ColorMaterial>>,
 ) {
-    for (e, mut ghost, mut sprite) in ghost_q.iter_mut() {
+    for (e, mut ghost, mut mesh, material) in ghost_q.iter_mut() {
         ghost.time -= time.delta_secs();
-        sprite.color = Color::hsva(ops::sin(ghost.time + ghost.start) * 90.0 + 180.0, 1.0, 1.0, ghost.time);
+
         if ghost.time <= 0.0 {
             commands.entity(e).despawn();
+        }
+        let rel = ghost.time / ghost.start;
+        //sprite.color = Color::hsva(ops::sin(ghost.time + ghost.start) * 90.0 + 180.0, 1.0, 1.0, ghost.time);
+        mesh.0 = meshes.add(Annulus::new(30.0 * rel.powf(5.0), 33.0 * rel.powf(5.0)));
+        if let Some(mut mat) = materials.get_mut(material) {
+            mat.color = Color::hsva(
+                ops::sin(ghost.time + ghost.start) * 90.0 + 180.0,
+                1.0,
+                1.0,
+                rel,
+            );
         }
     }
 }

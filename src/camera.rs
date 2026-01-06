@@ -1,4 +1,3 @@
-use crate::mario::Mario;
 use bevy::prelude::*;
 
 #[derive(Event, Copy, Clone)]
@@ -63,8 +62,7 @@ impl Default for FollowAxes {
 }
 
 pub(crate) fn plugin(app: &mut App) {
-    app.add_systems(PostUpdate, (update_clamp, follow_target).chain())
-        .add_observer(reset_camera_limits);
+    app.add_systems(PostUpdate, (update_clamp, follow_target).chain());
 }
 
 pub fn update_clamp(
@@ -118,12 +116,4 @@ pub fn follow_target(
             transform.translation.y = xf.translation.y.clamp(min_pos.y, max_pos.y);
         }
     }
-}
-fn reset_camera_limits(
-    _trigger: On<CameraReset>,
-    mario: Single<&Transform, With<Mario>>,
-    mut clamp_pos: Single<&mut ClampPosition>,
-) {
-    info!("Resetting camera limits");
-    clamp_pos.min = mario.translation.xy();
 }
