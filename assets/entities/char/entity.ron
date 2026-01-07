@@ -1,9 +1,4 @@
 (
-    jump_stats: (
-           jump_height: 80.0,
-           jump_time: 0.5,
-           fall_time: 0.5,
-    ),
     move_stats: (
            move_speed: 75.0,
            run_speed: 135.0,

@@ -1,19 +1,4 @@
 (
-    left: (Keyboard(
-        key: KeyA,
-        mod_keys: (0),
-    ), Keyboard(
-        key: ArrowLeft,
-        mod_keys: (0),
-    ), GamepadButton(DPadLeft)),
-    right: (Keyboard(
-        key: KeyD,
-        mod_keys: (0),
-    ), Keyboard(
-        key: ArrowRight,
-        mod_keys: (0),
-    ), GamepadButton(DPadRight)),
-    mv: (GamepadAxis(LeftStickX), r#None, r#None),
     jump: (Keyboard(
         key: Space,
         mod_keys: (0),
@@ -22,13 +7,6 @@
         key: ShiftLeft,
         mod_keys: (0),
     ), GamepadButton(LeftTrigger), r#None),
-    crouch: (Keyboard(
-        key: KeyS,
-        mod_keys: (0),
-    ), Keyboard(
-        key: ArrowDown,
-        mod_keys: (0),
-    ), r#None),
     respawn: (Keyboard(
         key: KeyR,
         mod_keys: (0),

@@ -1,5 +1,4 @@
 use crate::char_controller::prelude::*;
-use crate::mario::JumpStats;
 use avian2d::math::{AdjustPrecision, AsF32};
 use avian2d::prelude::*;
 use bevy::color::palettes::tailwind;
@@ -11,6 +10,10 @@ use std::marker::PhantomData;
 
 #[derive(Component, Default, Clone, Copy, Reflect)]
 pub struct Grounded;
+//separate control logics by type of controller
+#[derive(Component, Default, Clone, Copy, Reflect)]
+pub struct SlideController;
+
 #[derive(Clone, Copy, Deserialize, Serialize)]
 pub enum ColliderShape {
     Ball(f32),
@@ -26,33 +29,7 @@ pub struct KinematicController {
 }
 pub(crate) fn plugin(app: &mut App) {
     app.add_plugins(PhysicsPlugins::default().with_length_unit(10.0))
-        .add_systems(
-            FixedUpdate,
-            (check_grounded, apply_gravity, perform_move_and_slide).chain(),
-        );
-}
-
-pub fn apply_gravity(
-    mut kinematics: Query<
-        (
-            &mut KinematicController,
-            Option<&GravityScale>,
-            Option<&mut JumpStats>,
-        ),
-        Without<Grounded>,
-    >,
-    time: Res<Time>,
-) {
-    for (mut controller, scale, stats) in kinematics.iter_mut() {
-        let mut gravity = match stats {
-            Some(mut t) => t.get_gravity(controller.velocity.y),
-            None => JumpStats::default().get_gravity(controller.velocity.y),
-        };
-        if let Some(GravityScale(scale)) = scale {
-            gravity *= scale;
-        }
-        controller.velocity.y += gravity * time.delta_secs();
-    }
+        .add_systems(FixedUpdate, perform_move_and_slide);
 }
 
 impl From<ColliderShape> for Collider {
@@ -69,29 +46,11 @@ impl Default for ColliderShape {
         ColliderShape::Cuboid(20.0, 20.0)
     }
 }
-fn check_grounded(
-    mut char: Query<(Entity, &ShapeHits, Option<&IgnoreGrounded>)>,
-    mut commands: Commands,
-) {
-    for (entity, hits, gr) in char.iter_mut() {
-        let is_grounded = hits.iter().count() > 0;
-        if gr.is_some() {
-            commands.entity(entity).remove::<IgnoreGrounded>();
-            continue;
-        }
-
-        if is_grounded {
-            info!("entity is grounded");
-            commands.entity(entity).insert(Grounded);
-        } else {
-            info!("entity is not grounded");
-
-            commands.entity(entity).try_remove::<Grounded>();
-        }
-    }
-}
 fn perform_move_and_slide(
-    mut char: Query<(Entity, &Collider, &mut KinematicController, &mut Transform)>,
+    mut char: Query<
+        (Entity, &Collider, &mut KinematicController, &mut Transform),
+        With<SlideController>,
+    >,
     mut tile_q: Query<&mut TileColor>,
     tilemap_q: Single<(
         &TilemapSize,
@@ -150,8 +109,8 @@ fn perform_move_and_slide(
                         hit.point.f32(),
                         (hit.point
                             + hit.normal.adjust_precision() * hit.collision_distance
-                            / time.delta_secs().adjust_precision())
-                            .f32(),
+                                / time.delta_secs().adjust_precision())
+                        .f32(),
                         tailwind::EMERALD_400,
                     );
                 }

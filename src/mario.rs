@@ -1,7 +1,9 @@
 use crate::camera::{CameraReset, ClampFlags, ClampPosition, FollowAxes, FollowerOf};
 use crate::input::{Crouch, InputSettings, Jump, Move, Run};
-use crate::physics::{ColliderShape, Grounded, IgnoreGrounded, KinematicController};
-use crate::time::{PausableSystems, TimeSince, update_time_since};
+use crate::physics::{
+    ColliderShape, Grounded, IgnoreGrounded, KinematicController, SlideController,
+};
+use crate::time::{update_time_since, PausableSystems, TimeSince};
 use avian2d::prelude::*;
 use bevy::asset::io::Writer;
 use bevy::prelude::*;
@@ -9,7 +11,7 @@ use bevy_ecs_ldtk::prelude::*;
 use bevy_enhanced_input::prelude::*;
 use ron::ser::PrettyConfig;
 use serde::Deserialize;
-use std::fs::{File, OpenOptions, read_to_string};
+use std::fs::{read_to_string, File, OpenOptions};
 use std::io::Write;
 use std::time::Duration;
 
@@ -27,104 +29,19 @@ impl Default for GhostConfig {
     }
 }
 #[derive(Component, Reflect, Deserialize)]
-pub struct Mario {
-    pub time_since_space: f32,
+pub struct Char {
     pub last_pos: f32,
     pub horizontal_dist: f32,
-    pub jumped: bool,
 }
-impl Default for Mario {
+impl Default for Char {
     fn default() -> Self {
         Self {
-            time_since_space: 1000.0,
             last_pos: 0.0,
             horizontal_dist: 0.0,
-            jumped: false,
         }
     }
 }
 
-impl Mario {
-    fn get_next_sprite_pos(&mut self, idx: i32) -> i32 {
-        (idx + 1) % 3 + 1
-    }
-}
-#[derive(Component, Reflect, Deserialize, Clone, Debug)]
-pub struct JumpStats {
-    jump_time: f32,
-    fall_time: f32,
-    jump_height: f32,
-    #[serde(default)]
-    jump_velocity: Option<f32>,
-    #[serde(default)]
-    jump_gravity: Option<f32>,
-    #[serde(default)]
-    fall_gravity: Option<f32>,
-}
-
-impl JumpStats {
-    pub fn new(jump_height: f32, jump_time: f32, fall_time: f32) -> Self {
-        let jump_velocity = Some((2.0 * jump_height) / jump_time);
-        let jump_gravity = Some((-2.0 * jump_height) / (jump_time * jump_time));
-        let fall_gravity = Some((-2.0 * jump_height) / (fall_time * fall_time));
-
-        let stats = Self {
-            jump_time,
-            fall_time,
-            jump_height,
-            jump_velocity,
-            jump_gravity,
-            fall_gravity,
-        };
-        info!("Jump stats made: {stats:?} ");
-        stats
-    }
-
-    pub fn get_gravity(&mut self, y_vel: f32) -> f32 {
-        if self.jump_gravity.is_none() || self.fall_gravity.is_none() {
-            self.calculate_params();
-        }
-        //should never fail
-        if y_vel > 0.0 {
-            self.jump_gravity.unwrap_or(-160.0)
-        } else {
-            self.fall_gravity.unwrap_or(-160.0)
-        }
-    }
-    pub fn get_jump_velocity(&mut self) -> f32 {
-        if self.jump_velocity.is_none() {
-            self.calculate_params();
-        }
-        //should also never fail unless something goes catastrophically wrong
-        self.jump_velocity.unwrap_or(2.0 * 80.0)
-    }
-
-    pub fn set_height(&mut self, jump_height: f32) {
-        self.jump_height = jump_height;
-        self.calculate_params();
-    }
-
-    pub fn set_jump_time(&mut self, jump_time: f32) {
-        self.jump_time = jump_time;
-        self.calculate_params();
-    }
-
-    pub fn set_fall_time(&mut self, fall_time: f32) {
-        self.fall_time = fall_time;
-        self.calculate_params();
-    }
-
-    fn calculate_params(&mut self) {
-        self.jump_velocity = Some((2.0 * self.jump_height) / self.jump_time);
-        self.jump_gravity = Some((-2.0 * self.jump_height) / (self.jump_time * self.jump_time));
-        self.fall_gravity = Some((-2.0 * self.jump_height) / (self.fall_time * self.fall_time));
-    }
-}
-impl Default for JumpStats {
-    fn default() -> Self {
-        Self::new(80.0, 1.0, 1.0)
-    }
-}
 #[derive(Component, Reflect, Deserialize, Clone, Debug)]
 pub struct MoveStats {
     pub move_speed: f32,
@@ -150,21 +67,22 @@ pub struct PlayerBundle {
     pub worldly: Worldly,
 
     #[from_entity_instance]
-    pub mario: MarioBundle,
+    pub char: CharBundle,
     pub controller: KinematicController,
 }
 
 #[derive(Bundle, Default, Deserialize)]
-pub struct MarioBundle {
+pub struct CharBundle {
     #[serde(default)]
-    pub mario: Mario,
+    pub char: Char,
     pub move_stats: MoveStats,
-    pub jump_stats: JumpStats,
     #[serde(default)]
     pub time_since: TimeSince<Grounded>,
     pub ghost_config: GhostConfig,
+    #[serde(skip)]
+    pub slide: SlideController,
 }
-impl From<&EntityInstance> for MarioBundle {
+impl From<&EntityInstance> for CharBundle {
     fn from(entity_instance: &EntityInstance) -> Self {
         let path = format!(
             "assets/entities/{}/entity.ron",
@@ -284,14 +202,13 @@ pub(crate) fn plugin(app: &mut App) {
     app.add_plugins(LdtkPlugin)
         .add_plugins((super::walls::WallPlugin, crate::camera::plugin))
         .insert_resource(LevelSelection::index(0))
-        .register_ldtk_entity::<PlayerBundle>("Mario")
+        .register_ldtk_entity::<PlayerBundle>("Char")
         .register_ldtk_entity::<GoalBundle>("Goal")
         .add_systems(Startup, setup)
         .add_systems(
             Update,
             (
                 move_mario,
-                update_sprite,
                 update_mario_gravity,
                 spawn_ghosts,
                 manage_ghosts,
@@ -299,92 +216,15 @@ pub(crate) fn plugin(app: &mut App) {
                 .chain()
                 .in_set(PausableSystems),
         )
-        .add_systems(PostUpdate, (jump, update_time_since::<Grounded>).chain())
         //.add_observer(friction)
         .add_observer(handle_mario_startup)
         .add_observer(reset_camera_limits)
         .add_observer(respawn_level);
 }
 
-fn update_sprite(
-    mario: Single<(
-        &mut Sprite,
-        &mut Mario,
-        &Transform,
-        &KinematicController,
-        Option<&Grounded>,
-    )>,
-) {
-    let (mut sprite, mut mario, tf, controller, grounded) = mario.into_inner();
-    let axis = controller.velocity.x;
-    let Some(atlas) = &mut sprite.texture_atlas else {
-        return;
-    };
-    if grounded.is_some() {
-        if axis != 0.0 {
-            mario.horizontal_dist += (tf.translation.x - mario.last_pos).abs();
-            if mario.horizontal_dist > 5.0 {
-                atlas.index = mario.get_next_sprite_pos(atlas.index as i32) as usize;
-                mario.horizontal_dist = 0.0
-            }
-            sprite.flip_x = axis < 0.0;
-        } else {
-            atlas.index = 0;
-        }
-    } else {
-        mario.horizontal_dist = 0.0;
-        atlas.index = 5;
-    }
-
-    mario.last_pos = tf.translation.x;
-}
-fn jump(
-    jump: Single<(&ActionEvents, &ActionTime), With<Action<Jump>>>,
-    mario: Single<(
-        Entity,
-        &mut KinematicController,
-        &mut Mario,
-        &mut JumpStats,
-        &mut TimeSince<Grounded>,
-    )>,
-    time: Res<Time>,
-    mut commands: Commands,
-) {
-    let (e, mut controller, mut mario, mut stats, mut time_since) = mario.into_inner();
-    if time_since.time == 0.0 && mario.jumped {
-        mario.jumped = false;
-        return;
-    }
-    let (&state, &ActionTime { elapsed_secs, .. }) = jump.into_inner();
-    if state.contains(ActionEvents::STARTED)
-        || state.contains(ActionEvents::ONGOING) && elapsed_secs < 0.1
-    {
-        mario.time_since_space = 0.0;
-    } else {
-        mario.time_since_space += time.delta_secs();
-    }
-    //don't jump if it's been 0.1s
-    //TODO: hardcoded for now, make them components?
-    if mario.time_since_space >= 0.1 {
-        return;
-    }
-    if time_since.time >= 0.1 {
-        return;
-    }
-    controller.velocity.y = stats.get_jump_velocity();
-    mario.time_since_space = 0.1;
-    time_since.time = 0.1;
-    //if we dont have an atlas something went very very wrong
-    mario.jumped = true;
-    commands.trigger(crate::time::TimerEvent::Start(Duration::from_secs_f32(0.1)));
-    commands.entity(e).remove::<Grounded>();
-    commands.entity(e).insert(IgnoreGrounded);
-    info!("jumped");
-}
-
 fn reset_camera_limits(
     _trigger: On<CameraReset>,
-    mario: Single<&Transform, With<Mario>>,
+    mario: Single<&Transform, With<Char>>,
     mut clamp_pos: Single<&mut ClampPosition>,
 ) {
     info!("Resetting camera limits");
@@ -393,7 +233,7 @@ fn reset_camera_limits(
 fn spawn_ghosts(
     mario_query: Single<
         (&Transform, &Sprite, &GhostConfig, &KinematicController),
-        (With<Mario>, Without<Grounded>),
+        (With<Char>, Without<Grounded>),
     >,
     mut commands: Commands,
     time: Res<Time>,
@@ -407,14 +247,12 @@ fn spawn_ghosts(
     if *timer > val && vel.length() > 100.0 {
         let shape = meshes.add(Annulus::new(30.0, 33.0));
         let color = Color::WHITE;
+        let time = rand::random_range(0.5..3.0);
         commands.spawn((
             Mesh2d(shape),
             MeshMaterial2d(materials.add(color)),
             xf,
-            Ghost {
-                time: 1.0,
-                start: rand::random_range(-10.0..10.0),
-            },
+            Ghost { time, start: time },
             Name::new("Ghost"),
         ));
         *timer = 0.0;
@@ -455,7 +293,7 @@ fn manage_ghosts(
 }
 
 fn update_mario_gravity(
-    mut query: Query<(&mut GravityScale, &KinematicController), (With<Mario>, Without<Grounded>)>,
+    mut query: Query<(&mut GravityScale, &KinematicController), (With<Char>, Without<Grounded>)>,
     jump_query: Query<&mut ActionState, With<Action<Jump>>>,
 ) {
     let jump_pressed = jump_query.iter().any(|&jump| jump == ActionState::Fired);
@@ -471,20 +309,20 @@ fn update_mario_gravity(
 fn respawn_level(
     _trigger: On<Start<crate::input::Respawn>>,
     mut commands: Commands,
-    level: Single<Entity, (With<LevelIid>, Without<Mario>)>,
+    level: Single<Entity, (With<LevelIid>, Without<Char>)>,
 ) {
     commands.entity(level.into_inner()).insert(Respawn);
     info!("respawning level");
     commands.trigger(CameraReset);
 }
 fn move_mario(
-    mario: Single<(&mut KinematicController, &MoveStats, Option<&Grounded>), With<Mario>>,
+    mario: Single<(&mut KinematicController, &MoveStats, Option<&Grounded>), With<Char>>,
     inputs: Single<&ActionValue, With<Action<Move>>>,
     run: Single<&ActionState, With<Action<Run>>>,
     time: Res<Time>,
 ) {
     let (mut vel, stats, grounded) = mario.into_inner();
-    let &ActionValue::Axis1D(axis) = inputs.into_inner() else {
+    let &ActionValue::Axis2D(axis) = inputs.into_inner() else {
         return;
     };
     let speed = if *run.into_inner() == ActionState::Fired {
@@ -496,11 +334,11 @@ fn move_mario(
     if grounded.is_none() {
         accel = 0.0;
     }
-    if axis != 0.0 {
+    if axis.length() != 0.0 {
         accel = 350.0;
     }
     vel.velocity = vel.velocity.move_towards(
-        vec2(axis * speed, vel.velocity.y),
+        axis * speed,
         time.delta_secs() * accel,
     );
 }
@@ -512,31 +350,22 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
 }
 
 fn handle_mario_startup(
-    e: On<Add, Mario>,
+    e: On<Add, Char>,
     mut commands: Commands,
     input_settings: Res<InputSettings>,
 ) {
     commands.entity(e.entity).insert(actions!(
-        Mario[(
-            Action::<Jump>::new(),
-            Bindings::spawn(SpawnIter(input_settings.jump.into_iter()))
-        ),
+        Char[
         (
             Action::<Run>::new(),
             Bindings::spawn(SpawnIter(input_settings.run.into_iter()))
         ),
         (
-            Action::<Crouch>::new(),
-            Bindings::spawn(SpawnIter(input_settings.crouch.into_iter()))
-        ),
-        (
             Action::<Move>::new(),
             DeadZone::default(),
             Bindings::spawn((
-            Bidirectional::new(input_settings.right[0], input_settings.left[0]),
-            Bidirectional::new(input_settings.right[1], input_settings.left[1]),
-            Bidirectional::new(input_settings.right[2], input_settings.left[2]),
-            SpawnIter(input_settings.mv.into_iter())
+            Cardinal::wasd_keys(),
+            Axial::left_stick()
             )),
 
         ),
@@ -549,7 +378,7 @@ fn handle_mario_startup(
     ));
     commands
         .entity(e.entity)
-        .insert(FollowAxes::new(FollowAxes::HORIZONTAL));
+        .insert(FollowAxes::new(FollowAxes::HORIZONTAL | FollowAxes::VERTICAL));
     commands.spawn((
         Camera2d,
         Projection::Orthographic(OrthographicProjection {
@@ -559,11 +388,11 @@ fn handle_mario_startup(
             },
             ..OrthographicProjection::default_2d()
         }),
-        //TODO spawn at mario location instead?
+        //TODO spawn at char location instead?
         Transform::from_xyz(1280.0 / 4.0, 238.0, 0.0),
         FollowerOf(e.entity),
         //per level camera
-        ClampFlags(ClampFlags::MIN_X),
+        ClampFlags(0),
         //TODO this really should use Option<T> for clamping
         ClampPosition {
             min: vec2(f32::NEG_INFINITY, f32::NEG_INFINITY),
@@ -571,4 +400,5 @@ fn handle_mario_startup(
         },
         TransformInterpolation,
     ));
+    info!("camera spawned");
 }

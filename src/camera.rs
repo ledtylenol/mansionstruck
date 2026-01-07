@@ -43,7 +43,7 @@ impl FollowAxes {
     pub const VERTICAL: u8 = 2;
 
     pub const fn new(axes: u8) -> Self {
-        assert!(axes == 2 || axes == 1);
+        assert!(axes == 2 || axes == 1 || axes == 3);
         Self(axes)
     }
 

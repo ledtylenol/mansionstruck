@@ -1,4 +1,4 @@
-use crate::mario::Mario;
+use crate::mario::Char;
 use bevy::prelude::*;
 use bevy_enhanced_input::prelude::*;
 use ron::ser::PrettyConfig;
@@ -9,12 +9,8 @@ use std::fs;
 #[derive(Resource, Debug, Reflect, Clone, Deserialize, Serialize)]
 #[serde(default)]
 pub struct InputSettings {
-    pub left: [Binding; 3],
-    pub right: [Binding; 3],
-    pub mv: [Binding; 3],
     pub jump: [Binding; 3],
     pub run: [Binding; 3],
-    pub crouch: [Binding; 3],
     pub respawn: [Binding; 3],
 }
 
@@ -32,28 +28,15 @@ impl InputSettings {
     }
 
     fn clear(&mut self) {
-        self.left.fill(Binding::None);
-        self.right.fill(Binding::None);
+        self.respawn.fill(Binding::None);
         self.jump.fill(Binding::None);
         self.run.fill(Binding::None);
-        self.crouch.fill(Binding::None);
     }
 }
 
 impl Default for InputSettings {
     fn default() -> Self {
         Self {
-            mv: [Axial::left_stick().x, Binding::None, Binding::None],
-            left: [
-                KeyCode::KeyA.into(),
-                KeyCode::ArrowLeft.into(),
-                GamepadButton::DPadLeft.into(),
-            ],
-            right: [
-                KeyCode::KeyD.into(),
-                KeyCode::ArrowRight.into(),
-                GamepadButton::DPadRight.into(),
-            ],
             jump: [
                 KeyCode::Space.into(),
                 GamepadButton::South.into(),
@@ -64,17 +47,12 @@ impl Default for InputSettings {
                 GamepadButton::LeftTrigger.into(),
                 Binding::None,
             ],
-            crouch: [
-                KeyCode::KeyS.into(),
-                KeyCode::ArrowDown.into(),
-                Binding::None,
-            ],
             respawn: [KeyCode::KeyR.into(), Binding::None, Binding::None],
         }
     }
 }
 #[derive(InputAction)]
-#[action_output(f32)]
+#[action_output(Vec2)]
 pub struct Move;
 
 #[derive(InputAction)]
@@ -94,7 +72,7 @@ pub struct Respawn;
 pub(crate) fn plugin(app: &mut App) {
     let input = InputSettings::default();
     app.add_plugins(EnhancedInputPlugin)
-        .add_input_context::<Mario>();
+        .add_input_context::<Char>();
     let res = InputSettings::read("assets/input.ron");
     match res {
         Ok(settings) => {
