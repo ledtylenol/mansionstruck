@@ -1,4 +1,4 @@
-use crate::camera::{CameraReset, ClampFlags, ClampPosition, FollowAxes, FollowerOf};
+use crate::camera::{CameraReset, ClampFlags, ClampPosition, FollowAxes, FollowWeight, FollowerOf};
 use crate::input::{Crouch, InputSettings, Jump, Move, Run};
 use crate::physics::{
     ColliderShape, Grounded, IgnoreGrounded, KinematicController, SlideController,
@@ -354,7 +354,8 @@ fn handle_mario_startup(
     mut commands: Commands,
     input_settings: Res<InputSettings>,
 ) {
-    commands.entity(e.entity).insert(actions!(
+    commands.entity(e.entity).insert(
+        actions!(
         Char[
         (
             Action::<Run>::new(),
@@ -379,7 +380,7 @@ fn handle_mario_startup(
     commands
         .entity(e.entity)
         .insert(FollowAxes::new(FollowAxes::HORIZONTAL | FollowAxes::VERTICAL));
-    commands.spawn((
+    let cam = commands.spawn((
         Camera2d,
         Projection::Orthographic(OrthographicProjection {
             scale: 0.35,
@@ -390,7 +391,6 @@ fn handle_mario_startup(
         }),
         //TODO spawn at char location instead?
         Transform::from_xyz(1280.0 / 4.0, 238.0, 0.0),
-        FollowerOf(e.entity),
         //per level camera
         ClampFlags(0),
         //TODO this really should use Option<T> for clamping
@@ -399,6 +399,8 @@ fn handle_mario_startup(
             max: vec2(10000000.0, 10000000.0),
         },
         TransformInterpolation,
-    ));
+    )).id();
+
+    commands.entity(e.entity).insert((FollowerOf(cam), FollowWeight(1)));
     info!("camera spawned");
 }
