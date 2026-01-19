@@ -1,1 +1,1 @@
-for map
+game of game
